@@ -1,109 +1,142 @@
-# Server Maintainer by woflo
+<h1 align="center">Server Maintainer</h1>
 
-A hands-off Minecraft server updater. Drop it in your server folder, run it, and forget about it. It keeps your Minecraft version, mods, plugins, and datapacks up to date automatically.
+<p align="center">
+  <b>Hands-off Minecraft server updates</b><br>
+  Keeps your server, mods, plugins, and datapacks up to date automatically.
+</p>
 
-## Features
+<p align="center">
+  <img src="https://img.shields.io/badge/Java-21+-orange?logo=openjdk&logoColor=white" alt="Java 21+">
+  <img src="https://img.shields.io/badge/Minecraft-1.20+-green?logo=minecraft&logoColor=white" alt="Minecraft">
+  <img src="https://img.shields.io/github/license/worflor/minecraft-server-maintainer?color=blue" alt="License">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey" alt="Platform">
+</p>
 
-- **Auto-updates Minecraft** - Detects and installs new stable versions
-- **Auto-updates mods/plugins/datapacks** - Pulls latest versions from Modrinth
-- **Multi-loader support** - Fabric, Quilt, Forge, NeoForge, Vanilla
-- **Smart compatibility checking** - Only updates Minecraft when enough mods support it
-- **Automatic backups** - Creates backups before updates, auto-cleans old ones
-- **Startup verification** - Tests that the server actually starts after updates
-- **Crash recovery** - Auto-restarts on crash with rate limiting
-- **Interactive mode** - Optional prompts before major changes
-- **Dry run mode** - Preview changes without applying them
+<p align="center">
+  <img src="https://img.shields.io/badge/Fabric-supported-brightgreen" alt="Fabric">
+  <img src="https://img.shields.io/badge/Quilt-supported-brightgreen" alt="Quilt">
+  <img src="https://img.shields.io/badge/Forge-supported-brightgreen" alt="Forge">
+  <img src="https://img.shields.io/badge/NeoForge-supported-brightgreen" alt="NeoForge">
+  <img src="https://img.shields.io/badge/Vanilla-supported-brightgreen" alt="Vanilla">
+</p>
+
+<p align="center">
+  <img src="assets/screenshot.webp" alt="Server Maintainer in action" width="600">
+</p>
+
+## What It Does
+
+**Replaces your `run.bat`.** Run this instead and it'll check for updates, apply them, then start your server.
+
+Before updating Minecraft it creates a backup. After any update it verifies the server boots. If something breaks after a Minecraft update, it rolls back.
 
 ## Quick Start
 
-1. Set up your Minecraft server normally (Fabric, Forge, etc.)
-2. Drop `server maintainer by woflo.jar` in your server folder
-3. Run it instead of your server JAR, or run.bat:
-   ```
-   java -jar "server maintainer by woflo.jar"
-   ```
-   (note: double clicking opens a console)
+**Requirements:** Java 21+, an existing Minecraft server
 
-That's it. It will check for updates, apply them, verify everything works, then start your server. 
+1. Drop `server maintainer by woflo.jar` in your server folder
+2. Double-click it
 
-## Command Line Options
+First run creates a config at `woflo/woflo.yml`. After that it just works.
+
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| Auto-updates | Minecraft, mod loaders, mods, plugins, datapacks |
+| Smart updates | Only updates Minecraft when enough mods support it |
+| Backups | Created before Minecraft updates, cleaned after 7 days |
+| Verification | Tests startup after updates, rolls back if needed |
+| Crash recovery | Restarts on crash with rate limiting |
+| Dry run | Preview changes with `-d` |
+
+## Usage
 
 ```
--d, --dry-run      Preview changes without applying
--u, --update-only  Update only, don't start server
--r, --rollback     Restore most recent backup
--i, --interactive  Prompt before updates
--y, --yes          Skip prompts (overrides config)
--h, --help         Show help
+java -jar "server maintainer by woflo.jar" [options]
 ```
+
+| Option | Description |
+|--------|-------------|
+| `-d, --dry-run` | Preview changes without applying |
+| `-u, --update-only` | Update only, don't start server |
+| `-r, --rollback` | Restore most recent backup |
+| `-i, --interactive` | Prompt before updates |
+| `-y, --yes` | Skip all prompts |
+| `-h, --help` | Show help |
 
 ## Configuration
 
-On first run, creates `woflo/woflo.yml`:
+Created at `woflo/woflo.yml` on first run:
 
 ```yaml
-# Memory allocation
 memory:
   min: 2G
   max: 6G
 
-# What to auto-update
 updates:
-  minecraft: true        # Minecraft + ModLoader
-  mods: true             # Mods from Modrinth
-  plugins: true          # Plugins from Modrinth
-  datapacks: false       # Datapacks from Modrinth
-  min-compatibility: 60  # Only update MC if this % of mods support it
-  allow-snapshots: false # Include Minecraft snapshots
-  allow-beta: false      # Include beta versions (mods/plugins/datapacks)
+  minecraft: true         # Minecraft + mod loader
+  mods: true              # Mods from Modrinth
+  plugins: true           # Plugins from Modrinth
+  datapacks: false        # Datapacks from Modrinth
+  min-compatibility: 60   # % of mods needed for MC update
+  allow-snapshots: false  # Include MC snapshots
+  allow-beta: false       # Include beta mods/plugins
 
-# Startup verification timeout (seconds)
-startup-timeout: 90
+startup-timeout: 90       # Seconds to wait for startup
+interactive: false        # Prompt before updates
 
-# Prompt before updates (override with -i or -y flags)
-interactive: false
+# Crash recovery
+restart-delay: 5          # Seconds before restart
+max-crashes: 3            # Crashes before cooldown
+crash-window: 300         # Window for counting crashes
 
-# Crash handling
-restart-delay: 5      # Seconds before restart
-max-crashes: 3        # Max crashes before cooldown
-crash-window: 300     # Crash tracking window (seconds)
-
-# Optional overrides
+# Optional
 # target-version: 1.21.0  # Lock to specific MC version
-# server-jar: server.jar  # Override JAR auto-detection
+# server-jar: server.jar  # Override auto-detection
 ```
 
-## How It Works
+## Skipping Updates
 
-1. **Detects your setup** - Finds your mod loader (Fabric/Forge/etc.) and current version
-2. **Checks for updates** - Queries Mojang API and Modrinth for new versions
-3. **Creates backup** - Backs up mods, loader files, and version info
-4. **Applies updates** - Downloads and installs new versions
-5. **Verifies startup** - Boots the server briefly to confirm it works
-6. **Starts server** - Runs your server with auto-restart on crash
+Works the same for mods, plugins, and datapacks.
 
-## Skipping Specific Mods
+After first run, check `mods/mods.txt` (or `plugins/plugins.txt`, `datapacks/datapacks.txt`). Prefix a filename with `#` to skip it:
 
-After running once, `mods/mods.txt` (or `plugins/plugins.txt`, `datapacks/datapacks.txt`) file will be created. Prefix filenames with `#` to skip updates:
+```
+# sodium-0.5.8.jar
+lithium-0.12.1.jar
+```
 
 ## Backups
 
-- Stored in `woflo/backups/`
-- Named by timestamp and reason (e.g., `20250125-143022_mc`)
-- Auto-cleaned after 7 days
-- Use `--rollback` to restore the most recent one
+Created before Minecraft updates. Stored in `woflo/backups/`, named like `20250125-143022_mc`. Cleaned after 7 days.
 
-## Requirements
+Restore manually with `--rollback`.
 
-- Java 21+
-- An existing Minecraft server setup
+## How It Works
 
-## Supported Platforms
-
-- Windows
-- Linux
-- macOS
+```
+┌─────────────────┐
+│  Detect Setup   │  Find mod loader, current versions
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│  Check Updates  │  Query Mojang API, Modrinth
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│  Apply Updates  │  Backup (if MC update), download, install
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│  Verify Start   │  Test server boots, rollback if needed
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│  Run Server     │  With crash recovery
+└─────────────────┘
+```
 
 ## License
 
-GPL-3.0
+[GPL-3.0](LICENSE)

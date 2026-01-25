@@ -1,0 +1,17 @@
+# Build outputs
+build/
+out/
+*.class
+*.jar
+
+# ProGuard (downloaded by build script)
+tools/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db

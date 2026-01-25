@@ -105,7 +105,7 @@ public class Updater {
         if (dry) { con.rowDone(row, ups + " to update"); for (var r : toUp) con.detail(r.id(), r.oldVersion(), r.newVersion()); return ups; }
         if (!confirm("Update " + ups + " " + type + (ups > 1 ? "s" : "") + "?")) { con.rowDone(row, String.valueOf(cur + skip) + " (skipped " + ups + ")"); return 0; }
         var dls = runParallel(toUp, u -> Http.downloadVerified(u.downloadUrl(), d.resolve(u.fileName()), u.sha512(), 3) ? u : null, row);
-        int ok = 0; for (var r : dls) if (r != null) { try { Files.deleteIfExists(r.path()); } catch (IOException e) {} ok++; }
+        int ok = 0; for (var r : dls) if (r != null) { try { if (!r.path().getFileName().toString().equals(r.fileName())) Files.deleteIfExists(r.path()); } catch (IOException e) {} ok++; }
         con.rowDone(row, ok + " updated");
         for (var r : dls) if (r != null) con.detail(r.id(), r.oldVersion(), r.newVersion());
         return ok;
@@ -161,7 +161,7 @@ public class Updater {
         } catch (Exception e) { return false; }
     }
     private boolean checkDisk() { try { long mb = Files.getFileStore(dir).getUsableSpace() / (1024 * 1024); if (mb < 500) { con.fail("Need 500MB free (" + mb + "MB available)"); return false; } if (mb < 1000) con.warn("Low disk: " + mb + "MB"); return true; } catch (IOException e) { return true; } }
-    private void initDirs() { try { Files.createDirectories(dir.resolve("mods")); Files.createDirectories(dir.resolve("backups")); } catch (IOException e) {} }
+    private void initDirs() { try { Files.createDirectories(dir.resolve("mods")); } catch (IOException e) {} }
 
     private String detectVersion() {
         Path vf = dir.resolve("current_version.txt");

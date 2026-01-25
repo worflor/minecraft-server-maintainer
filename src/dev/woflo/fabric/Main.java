@@ -37,7 +37,7 @@ public class Main {
     }
 
     private static void doRollback() {
-        Path backups = serverDir.resolve("backups");
+        Path backups = serverDir.resolve("woflo").resolve("backups");
         if (!Files.exists(backups)) { console.fail("No backups folder found"); System.exit(1); }
         try (var s = Files.list(backups)) {
             var latest = s.filter(Files::isDirectory).max(Comparator.comparing(p -> p.getFileName().toString()));

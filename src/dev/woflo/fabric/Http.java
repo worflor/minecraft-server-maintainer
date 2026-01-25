@@ -22,8 +22,8 @@ public class Http {
             .header("User-Agent", USER_AGENT).timeout(TIMEOUT).GET().build();
         var res = client.send(req, HttpResponse.BodyHandlers.ofString());
         if (res.statusCode() == 429 && retries > 0) {
-            int wait = Math.min(res.headers().firstValue("Retry-After").map(Integer::parseInt).orElse(5), 60);
-            Thread.sleep(wait * 1000L);
+            int wait = res.headers().firstValue("Retry-After").map(s -> { try { return Integer.parseInt(s); } catch (NumberFormatException e) { return 5; } }).orElse(5);
+            Thread.sleep(Math.min(wait, 60) * 1000L);
             return get(url, retries - 1);
         }
         if (res.statusCode() != 200) throw new IOException("HTTP " + res.statusCode());
@@ -41,8 +41,8 @@ public class Http {
         var res = client.send(req, HttpResponse.BodyHandlers.ofFile(dest));
         if (res.statusCode() == 429 && retries > 0) {
             Files.deleteIfExists(dest);
-            int wait = Math.min(res.headers().firstValue("Retry-After").map(Integer::parseInt).orElse(5), 60);
-            Thread.sleep(wait * 1000L);
+            int wait = res.headers().firstValue("Retry-After").map(s -> { try { return Integer.parseInt(s); } catch (NumberFormatException e) { return 5; } }).orElse(5);
+            Thread.sleep(Math.min(wait, 60) * 1000L);
             download(url, dest, retries - 1);
             return;
         }

@@ -36,7 +36,7 @@ public class Backup {
             console.info("Restored from backup");
             return true;
         } catch (IOException e) {
-            for (Path tmp : renamed) { try { Path orig = tmp.resolveSibling(tmp.getFileName().toString().replace(".old", "")); if (!Files.exists(orig)) Files.move(tmp, orig); } catch (IOException e2) {} }
+            for (Path tmp : renamed) { try { String name = tmp.getFileName().toString(); Path orig = tmp.resolveSibling(name.endsWith(".old") ? name.substring(0, name.length() - 4) : name); if (!Files.exists(orig)) Files.move(tmp, orig); } catch (IOException e2) {} }
             console.fail("Restore failed: " + e.getMessage()); return false;
         }
     }

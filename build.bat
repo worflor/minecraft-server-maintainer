@@ -45,7 +45,12 @@ if errorlevel 1 ( echo Optimization failed! & pause & exit /b 1 )
 
 :: Create manifest and package
 echo Packaging...
-echo Main-Class: dev.woflo.fabric.Main> build\MANIFEST.MF
+(
+echo Main-Class: dev.woflo.fabric.Main
+echo Implementation-Title: Server Maintainer
+echo Implementation-Version: 1.0.0
+echo Implementation-Vendor: woflo
+) > build\MANIFEST.MF
 cd build\optimized
 jar cfm "..\server maintainer by woflo.jar" ..\MANIFEST.MF .
 cd ..\..

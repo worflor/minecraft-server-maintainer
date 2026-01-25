@@ -41,7 +41,12 @@ if [ $? -ne 0 ]; then echo "Optimization failed!"; exit 1; fi
 
 # Package
 echo "Packaging..."
-echo "Main-Class: dev.woflo.fabric.Main" > build/MANIFEST.MF
+cat > build/MANIFEST.MF << 'EOF'
+Main-Class: dev.woflo.fabric.Main
+Implementation-Title: Server Maintainer
+Implementation-Version: 1.0.0
+Implementation-Vendor: woflo
+EOF
 cd build/optimized
 jar cfm "../server maintainer by woflo.jar" ../MANIFEST.MF .
 cd ../..

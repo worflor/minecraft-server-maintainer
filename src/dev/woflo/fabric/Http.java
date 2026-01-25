@@ -11,7 +11,7 @@ import java.util.*;
 
 public class Http {
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
-    private static final String USER_AGENT = "woflo/ServerMaintainer/1.0 (github.com/woflo)";
+    private static final String USER_AGENT = "woflo/ServerMaintainer/1.0 (github.com/worflor/minecraft-server-maintainer)";
     private static final HttpClient client = HttpClient.newBuilder()
         .connectTimeout(TIMEOUT).followRedirects(HttpClient.Redirect.NORMAL).build();
 

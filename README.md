@@ -1,4 +1,4 @@
-<h1 align="center">Server Maintainer</h1>
+<h1 align="center">Server Maintainer, by woflo</h1>
 
 <p align="center">
   <b>Hands-off Minecraft server updates</b><br>

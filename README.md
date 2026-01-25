@@ -6,6 +6,7 @@
 </p>
 
 <p align="center">
+  <a href="https://woflo.dev"><img src="https://img.shields.io/badge/by-woflo-purple" alt="woflo.dev"></a>
   <img src="https://img.shields.io/badge/Java-21+-orange?logo=openjdk&logoColor=white" alt="Java 21+">
   <img src="https://img.shields.io/badge/Minecraft-1.20+-green?logo=minecraft&logoColor=white" alt="Minecraft">
   <img src="https://img.shields.io/github/license/worflor/minecraft-server-maintainer?color=blue" alt="License">
@@ -81,7 +82,7 @@ updates:
   mods: true
   plugins: true
   datapacks: false
-  min-compatibility: 60
+  min-compatibility: 90
   allow-snapshots: false
   allow-beta: false
 

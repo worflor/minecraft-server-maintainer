@@ -123,10 +123,9 @@ public enum Loader {
     private boolean installNeoForge(String mc, Path dir, Console c) throws Exception {
         String[] p = mc.split("\\."); String pfx = (p.length >= 2 ? p[1] : "21") + "." + (p.length >= 3 ? p[2] : "0") + ".";
         var vers = Http.list(Http.getJson("https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge"), "versions");
-        String nv = null;
-        for (int i = vers.size() - 1; i >= 0; i--) { String v = vers.get(i).toString(); if (v.startsWith(pfx) && !v.contains("-beta") && !v.contains("-alpha")) { nv = v; break; } }
-        if (nv == null) for (int i = vers.size() - 1; i >= 0; i--) { String v = vers.get(i).toString(); if (v.startsWith(pfx)) { nv = v; break; } }
-        if (nv == null) { c.fail("No NeoForge for MC " + mc); return false; }
+        String nv = null, fallback = null;
+        for (var o : vers.reversed()) { String v = o.toString(); if (v.startsWith(pfx)) { if (!v.contains("-beta") && !v.contains("-alpha")) { nv = v; break; } if (fallback == null) fallback = v; } }
+        if (nv == null) nv = fallback; if (nv == null) { c.fail("No NeoForge for MC " + mc); return false; }
         return runInstaller(List.of(Map.of("url", "https://maven.neoforged.net/releases/net/neoforged/neoforge/" + nv + "/neoforge-" + nv + "-installer.jar")), dir, c, "java", "-jar", "installer.jar", "--installServer");
     }
 

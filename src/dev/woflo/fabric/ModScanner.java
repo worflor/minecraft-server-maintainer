@@ -13,10 +13,14 @@ public class ModScanner {
     public static final ScanConfig PLUGINS = new ScanConfig(".jar", "plugins.txt", "# Server Maintainer - Plugin List\n# Add # before a filename to skip updates\n\n");
     public static final ScanConfig DATAPACKS = new ScanConfig(".zip", "datapacks.txt", "# Server Maintainer - Datapack List\n# Add # before a filename to skip updates\n\n");
 
+    private static List<Path> listFiles(Path dir, String ext) throws IOException {
+        try (var s = Files.list(dir)) { return s.filter(p -> p.toString().endsWith(ext)).toList(); }
+    }
+
     public static List<Mod> scan(Path dir, Loader loader) throws IOException {
         if (!Files.exists(dir)) return List.of();
         Set<String> ignored = loader.ignoredModIds();
-        List<Path> jars; try (var s = Files.list(dir)) { jars = s.filter(p -> p.toString().endsWith(".jar")).toList(); }
+        List<Path> jars = listFiles(dir, ".jar");
         Set<String> skipped = readSkipped(dir, MODS);
         List<Mod> all;
         try (var ex = Executors.newVirtualThreadPerTaskExecutor()) {
@@ -35,7 +39,7 @@ public class ModScanner {
 
     private static List<Mod> scanSimple(Path dir, ScanConfig cfg) throws IOException {
         if (!Files.exists(dir)) return List.of();
-        List<Path> files; try (var s = Files.list(dir)) { files = s.filter(p -> p.toString().endsWith(cfg.ext)).toList(); }
+        List<Path> files = listFiles(dir, cfg.ext);
         Set<String> skipped = readSkipped(dir, cfg);
         List<Mod> all = files.stream().map(f -> new Mod(f.getFileName().toString().replace(cfg.ext, ""), f, f.getFileName().toString())).toList();
         writeTxt(dir, cfg, all, skipped);

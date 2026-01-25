@@ -65,17 +65,20 @@ public class Main {
         }
         long[] crashes = new long[config.maxCrashes]; int ci = 0;
         long windowMs = config.crashWindow * 1000L, delayMs = config.restartDelay * 1000L;
+        Process proc = null;
         while (true) {
             try {
                 long start = System.currentTimeMillis();
-                int exit = new ProcessBuilder(cmd).directory(serverDir.toFile()).inheritIO().start().waitFor();
+                proc = new ProcessBuilder(cmd).directory(serverDir.toFile()).inheritIO().start();
+                int exit = proc.waitFor();
+                proc = null;
                 long run = System.currentTimeMillis() - start;
                 if (exit == 0 || run > windowMs) { crashes = new long[config.maxCrashes]; System.out.println("\nServer stopped. Restarting in " + config.restartDelay + " seconds...\n"); Thread.sleep(delayMs); continue; }
                 crashes[ci] = System.currentTimeMillis(); ci = (ci + 1) % config.maxCrashes;
                 int recent = 0; long now = System.currentTimeMillis(); for (long t : crashes) if (t > 0 && now - t < windowMs) recent++;
                 if (recent >= config.maxCrashes) { console.fail("Server crashed " + config.maxCrashes + " times in " + (config.crashWindow / 60) + " minutes"); console.warn("Check logs. Waiting " + (config.crashWindow / 60) + " minutes..."); crashes = new long[config.maxCrashes]; Thread.sleep(windowMs); }
                 else { System.out.println("\nServer crashed (exit " + exit + "). Restarting in " + config.restartDelay + " seconds...\n"); Thread.sleep(delayMs); }
-            } catch (InterruptedException e) { break; } catch (Exception e) { System.err.println("Failed to start: " + e.getMessage()); try { Thread.sleep(delayMs); } catch (InterruptedException e2) {} }
+            } catch (InterruptedException e) { if (proc != null) proc.destroyForcibly(); break; } catch (Exception e) { System.err.println("Failed to start: " + e.getMessage()); try { Thread.sleep(delayMs); } catch (InterruptedException e2) {} }
         }
     }
 

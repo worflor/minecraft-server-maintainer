@@ -33,33 +33,34 @@ if not exist "tools\proguard.jar" (
 if exist build rmdir /s /q build
 mkdir build\classes
 
-:: Compile (target Java 21 for ProGuard compatibility)
+:: Compile (Java 21, no debug info)
 echo Compiling...
-javac -g:none -d build\classes -sourcepath src src\dev\woflo\fabric\*.java
+javac -g:none --release 21 -d build\classes -sourcepath src src\dev\woflo\fabric\*.java
 if errorlevel 1 ( echo Compilation failed! & pause & exit /b 1 )
 
-:: Optimize with ProGuard
+:: Optimize with ProGuard (aggressive inlining via hidden JVM flag)
 echo Optimizing...
-java -jar tools\proguard.jar @proguard.cfg
+java -Dmaximum.inlined.code.length=32 -jar tools\proguard.jar @proguard.cfg
 if errorlevel 1 ( echo Optimization failed! & pause & exit /b 1 )
 
-:: Create manifest and package
+:: Create minimal manifest and package
 echo Packaging...
 (
+echo Manifest-Version: 1.0
 echo Main-Class: dev.woflo.fabric.Main
-echo Implementation-Title: Server Maintainer
-echo Implementation-Version: 1.0.0
-echo Implementation-Vendor: woflo
 ) > build\MANIFEST.MF
 cd build\optimized
 jar cfm "..\server maintainer by woflo.jar" ..\MANIFEST.MF .
 cd ..\..
 
-:: Show size comparison
+:: Recompress with advzip if available (zopfli = better deflate)
+where advzip >nul 2>&1 && (
+    echo Recompressing with zopfli...
+    advzip -z -4 "build\server maintainer by woflo.jar"
+)
+
+:: Show final size
 echo.
-echo Size comparison:
-for %%F in (build\classes\dev\woflo\fabric\*.class) do set /a orig+=%%~zF
-dir /b build\classes\dev\woflo\fabric\*.class 2>nul | find /c /v "" > nul
 for %%F in ("build\server maintainer by woflo.jar") do echo Final JAR: %%~zF bytes
 echo.
 echo Done!

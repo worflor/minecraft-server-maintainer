@@ -22,12 +22,13 @@ public class Console {
             || System.getProperty("os.name").toLowerCase().contains("win") || System.console() != null;
     }
 
-    private String p(String s) { return c ? P + s + R : s; }
-    private String g(String s) { return c ? G + s + R : s; }
-    private String y(String s) { return c ? Y + s + R : s; }
-    private String r(String s) { return c ? E + s + R : s; }
-    private String a(String s) { return c ? A + s + R : s; }
-    private String w(String s) { return c ? W + s + R : s; }
+    private String col(String s, String x) { return c ? x + s + R : s; }
+    private String p(String s) { return col(s, P); }
+    private String g(String s) { return col(s, G); }
+    private String y(String s) { return col(s, Y); }
+    private String r(String s) { return col(s, E); }
+    private String a(String s) { return col(s, A); }
+    private String w(String s) { return col(s, W); }
 
     private void log(String type, String msg) {
         log.println("[" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "] " + type + " | " + msg);

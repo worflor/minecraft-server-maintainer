@@ -19,13 +19,15 @@ public class Api {
 
     public static CheckResult checkMod(ModScanner.Mod mod, String mcVersion, Loader loader, boolean allowBeta) { return checkMod(mod, mcVersion, loader.modrinthLoaders(), allowBeta); }
 
+    private static CheckResult skip(ModScanner.Mod m, String v) { return new CheckResult(m.id(), m.path(), "skip", v, null, null, null, null); }
+
     public static CheckResult checkMod(ModScanner.Mod mod, String mcVersion, List<String> loaders, boolean allowBeta) {
-        if (loaders.isEmpty()) return new CheckResult(mod.id(), mod.path(), "skip", null, null, null, null, null);
+        if (loaders.isEmpty()) return skip(mod, null);
         try {
             String hash = Http.sha512(mod.path());
             Map<String, Object> current;
             try { current = Http.getJson("https://api.modrinth.com/v2/version_file/" + hash); }
-            catch (IOException e) { return new CheckResult(mod.id(), mod.path(), "skip", null, null, null, null, null); }
+            catch (IOException e) { return skip(mod, null); }
 
             String projectId = Http.str(current, "project_id"), oldVer = Http.str(current, "version_number");
             List<Object> versions = null;
@@ -34,7 +36,7 @@ public class Api {
                     Http.encode("[\"" + mcVersion + "\"]") + "&loaders=" + Http.encode("[\"" + l + "\"]"));
                 if (versions != null && !versions.isEmpty()) break;
             }
-            if (versions == null || versions.isEmpty()) return new CheckResult(mod.id(), mod.path(), "skip", oldVer, null, null, null, null);
+            if (versions == null || versions.isEmpty()) return skip(mod, oldVer);
 
             // prefer release, allow beta if enabled
             Map<String, Object> latest = null;
@@ -43,17 +45,17 @@ public class Api {
                 String type = Http.str(ver, "version_type");
                 if ("release".equals(type) || (allowBeta && "beta".equals(type))) { latest = ver; break; }
             }
-            if (latest == null) return new CheckResult(mod.id(), mod.path(), "skip", oldVer, null, null, null, null);
+            if (latest == null) return skip(mod, oldVer);
             String newVer = Http.str(latest, "version_number");
             var files = Http.arr(latest, "files");
             Map<String, Object> file = null;
             for (var f : files) if (Http.bool(f, "primary", false)) { file = f; break; }
             if (file == null && !files.isEmpty()) file = files.getFirst();
-            if (file == null) return new CheckResult(mod.id(), mod.path(), "skip", oldVer, null, null, null, null);
+            if (file == null) return skip(mod, oldVer);
 
             if (oldVer != null && oldVer.equals(newVer)) return new CheckResult(mod.id(), mod.path(), "current", oldVer, newVer, null, null, null);
             var hashes = Http.obj(file, "hashes");
             return new CheckResult(mod.id(), mod.path(), "update", oldVer, newVer, Http.str(file, "url"), hashes != null ? Http.str(hashes, "sha512") : null, Http.str(file, "filename"));
-        } catch (Exception ignored) { return new CheckResult(mod.id(), mod.path(), "skip", null, null, null, null, null); }
+        } catch (Exception ignored) { return skip(mod, null); }
     }
 }

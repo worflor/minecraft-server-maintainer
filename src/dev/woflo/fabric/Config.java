@@ -15,7 +15,7 @@ public class Config {
     public boolean updateMinecraft = true, updateMods = true, updatePlugins = true, updateDatapacks = false;
     public boolean allowSnapshots = false, allowBeta = false;
     public boolean interactive = false;
-    public int minCompatibility = 60, startupTimeout = 90;
+    public int minCompatibility = 90, startupTimeout = 90;
     public int restartDelay = 5, maxCrashes = 3, crashWindow = 300;
     public String targetVersion = null, serverJar = null;
     public static final int BACKUP_KEEP_DAYS = 7;
@@ -36,7 +36,7 @@ public class Config {
               mods: true             # Mods will update from Modrinth
               plugins: true          # Plugins will update from Modrinth (if plugins/ exists)
               datapacks: false       # Datapacks, from Modrinth (if world/datapacks/ exists)
-              min-compatibility: 60  # Only update MC if this % of content support it
+              min-compatibility: 90  # Only update MC if this % of content support it
               allow-snapshots: false # Include Minecraft snapshots/pre-releases
               allow-beta: false      # Include beta versions (mods/plugins/datapacks)
 
@@ -126,7 +126,7 @@ public class Config {
                         case "mods" -> updateMods = bool(val);
                         case "plugins" -> updatePlugins = bool(val);
                         case "datapacks" -> updateDatapacks = bool(val);
-                        case "min-compatibility" -> minCompatibility = num(val, 60);
+                        case "min-compatibility" -> minCompatibility = num(val, 90);
                         case "allow-snapshots" -> allowSnapshots = bool(val);
                         case "allow-beta" -> allowBeta = bool(val);
                     }

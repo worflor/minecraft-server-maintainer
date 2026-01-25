@@ -16,14 +16,12 @@ public class Http {
         .connectTimeout(TIMEOUT).followRedirects(HttpClient.Redirect.NORMAL).build();
 
     public static String get(String url) throws IOException, InterruptedException { return get(url, 3); }
+    private static HttpRequest req(String url, Duration t) { return HttpRequest.newBuilder().uri(URI.create(url)).header("User-Agent", USER_AGENT).timeout(t).GET().build(); }
 
     private static String get(String url, int retries) throws IOException, InterruptedException {
-        var req = HttpRequest.newBuilder().uri(URI.create(url))
-            .header("User-Agent", USER_AGENT).timeout(TIMEOUT).GET().build();
-        var res = client.send(req, HttpResponse.BodyHandlers.ofString());
+        var res = client.send(req(url, TIMEOUT), HttpResponse.BodyHandlers.ofString());
         if (res.statusCode() == 429 && retries > 0) {
-            int wait = res.headers().firstValue("Retry-After").map(s -> { try { return Integer.parseInt(s); } catch (NumberFormatException e) { return 5; } }).orElse(5);
-            Thread.sleep(Math.min(wait, 60) * 1000L);
+            Thread.sleep(Math.min(parseRetryAfter(res), 60) * 1000L);
             return get(url, retries - 1);
         }
         if (res.statusCode() != 200) throw new IOException("HTTP " + res.statusCode());
@@ -36,17 +34,17 @@ public class Http {
     public static void download(String url, Path dest) throws IOException, InterruptedException { download(url, dest, 3); }
 
     private static void download(String url, Path dest, int retries) throws IOException, InterruptedException {
-        var req = HttpRequest.newBuilder().uri(URI.create(url))
-            .header("User-Agent", USER_AGENT).timeout(Duration.ofSeconds(60)).GET().build();
-        var res = client.send(req, HttpResponse.BodyHandlers.ofFile(dest));
+        Path tmp = dest.resolveSibling(dest.getFileName() + ".tmp");
+        var res = client.send(req(url, Duration.ofSeconds(60)), HttpResponse.BodyHandlers.ofFile(tmp));
         if (res.statusCode() == 429 && retries > 0) {
-            Files.deleteIfExists(dest);
-            int wait = res.headers().firstValue("Retry-After").map(s -> { try { return Integer.parseInt(s); } catch (NumberFormatException e) { return 5; } }).orElse(5);
-            Thread.sleep(Math.min(wait, 60) * 1000L);
+            Files.deleteIfExists(tmp);
+            Thread.sleep(Math.min(parseRetryAfter(res), 60) * 1000L);
             download(url, dest, retries - 1);
             return;
         }
-        if (res.statusCode() != 200) { Files.deleteIfExists(dest); throw new IOException("HTTP " + res.statusCode()); }
+        if (res.statusCode() != 200) { Files.deleteIfExists(tmp); throw new IOException("HTTP " + res.statusCode()); }
+        try { Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
+        catch (AtomicMoveNotSupportedException e) { Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING); }
     }
 
     public static boolean downloadVerified(String url, Path dest, String hash, int retries) {
@@ -61,6 +59,10 @@ public class Http {
     }
 
     public static String encode(String s) { return URLEncoder.encode(s, StandardCharsets.UTF_8); }
+
+    private static int parseRetryAfter(HttpResponse<?> res) {
+        return res.headers().firstValue("Retry-After").map(s -> { try { return Integer.parseInt(s); } catch (NumberFormatException e) { return 5; } }).orElse(5);
+    }
 
     public static String sha512(Path file) throws IOException {
         try {

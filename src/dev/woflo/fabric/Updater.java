@@ -34,16 +34,18 @@ public class Updater {
     public int run() {
         if (!checkJava()) { con.fail("Java 21+ required"); return 1; }
         if (!checkDisk()) return 1;
+        if (checkPending()) return 1;
         initDirs(); Backup.cleanup(dir, Config.BACKUP_KEEP_DAYS);
+        if (!dry) writePending();
         String current = detectVersion();
 
         if (current == null) {
             con.header(loader.displayName(), "new"); if (dry) con.dryRun();
             con.checking("Fetching latest");
             String target = loader.getLatestSupported(cfg.allowSnapshots);
-            if (target == null) { con.fail("Cannot fetch versions"); return 1; }
+            if (target == null) { con.fail("Cannot fetch versions"); clearPending(); return 1; }
             con.checkDone(target, true);
-            if (!dry) { con.checking("Installing " + loader.displayName()); if (!loader.install(target, dir, con)) return 1; con.checkDone("installed", true); writeVersion(target); }
+            if (!dry) { con.checking("Installing " + loader.displayName()); if (!loader.install(target, dir, con)) { clearPending(); return 1; } con.checkDone("installed", true); writeVersion(target); }
             current = target;
         }
 
@@ -66,33 +68,32 @@ public class Updater {
         if (current.equals(latest) || !cfg.updateMinecraft) con.rowDone(row++, current);
         else if (!loader.isReady(latest)) con.rowDone(row++, current + " (" + latest + " pending)");
         else {
-            List<ModScanner.Mod> mods; try { mods = ModScanner.scan(dir.resolve("mods"), loader); } catch (IOException e) { mods = new ArrayList<>(); }
+            var mods = safe(() -> ModScanner.scan(dir.resolve("mods"), loader), List.<ModScanner.Mod>of());
             int compat = mods.isEmpty() ? 100 : checkCompat(mods, latest, row);
             if (compat < cfg.minCompatibility) { con.rowDone(row++, current); con.warn("Update to " + latest + " blocked (" + compat + "% compat)"); }
             else if (!confirm("Update Minecraft " + current + " -> " + latest + "?")) { con.rowDone(row++, current); }
             else {
                 backup = Backup.create(dir, loader, "mc", con);
-                if (backup == null && !dry) { con.fail("Backup required"); con.showCursor(); return 1; }
-                if (!dry && !loader.install(latest, dir, con)) { Backup.restore(backup, dir, loader, con); con.showCursor(); return 1; }
+                if (backup == null && !dry) { con.fail("Backup required"); clearPending(); con.showCursor(); return 1; }
+                if (!dry && !loader.install(latest, dir, con)) { Backup.restore(backup, dir, loader, con); clearPending(); con.showCursor(); return 1; }
                 if (!dry) { writeVersion(latest); cleanOld(latest); }
                 con.rowDoneUpdate(row++, current, latest); target = latest; mcUp = true;
             }
         }
 
         final String mcT = target; int upd = 0;
-        if (checkMods) { upd += hasMods ? updateContent(row, modsDir, "mod", () -> scan(modsDir, loader), m -> Api.checkMod(m, mcT, loader, cfg.allowBeta)) : skip(row); row++; }
-        if (checkPlugins) { upd += hasPlugins ? updateContent(row, pluginsDir, "plugin", () -> scanP(pluginsDir), m -> Api.checkMod(m, mcT, Api.PLUGIN_LOADERS, cfg.allowBeta)) : skip(row); row++; }
-        if (checkDatapacks) { upd += hasDatapacks ? updateContent(row, datapacksDir, "datapack", () -> scanD(datapacksDir), m -> Api.checkMod(m, mcT, Api.DATAPACK_LOADERS, cfg.allowBeta)) : skip(row); row++; }
+        if (checkMods) { try { upd += hasMods ? updateContent(row, modsDir, "mod", () -> safe(() -> ModScanner.scan(modsDir, loader), List.of()), m -> Api.checkMod(m, mcT, loader, cfg.allowBeta)) : skip(row); } catch (Exception e) { con.rowSkip(row, "API error"); } row++; }
+        if (checkPlugins) { try { upd += hasPlugins ? updateContent(row, pluginsDir, "plugin", () -> safe(() -> ModScanner.scanPlugins(pluginsDir), List.of()), m -> Api.checkMod(m, mcT, Api.PLUGIN_LOADERS, cfg.allowBeta)) : skip(row); } catch (Exception e) { con.rowSkip(row, "API error"); } row++; }
+        if (checkDatapacks) { try { upd += hasDatapacks ? updateContent(row, datapacksDir, "datapack", () -> safe(() -> ModScanner.scanDatapacks(datapacksDir), List.of()), m -> Api.checkMod(m, mcT, Api.DATAPACK_LOADERS, cfg.allowBeta)) : skip(row); } catch (Exception e) { con.rowSkip(row, "API error"); } row++; }
 
-        if (!dry && (mcUp || upd > 0)) { con.blankLine(); if (!verify()) { if (backup != null) Backup.restore(backup, dir, loader, con); con.showCursor(); return 1; } }
+        if (!dry && (mcUp || upd > 0)) { con.blankLine(); checkIntegrity(); if (!verify()) { if (backup != null) Backup.restore(backup, dir, loader, con); clearPending(); con.showCursor(); return 1; } }
+        if (!dry) clearPending();
         if (dry) con.showCursor(); else con.countdown();
         return 0;
     }
 
     private int skip(int row) { con.rowSkip(row, "no folder"); return 0; }
-    private List<ModScanner.Mod> scan(Path d, Loader l) { try { return ModScanner.scan(d, l); } catch (IOException e) { return List.of(); } }
-    private List<ModScanner.Mod> scanP(Path d) { try { return ModScanner.scanPlugins(d); } catch (IOException e) { return List.of(); } }
-    private List<ModScanner.Mod> scanD(Path d) { try { return ModScanner.scanDatapacks(d); } catch (IOException e) { return List.of(); } }
+    private <T> T safe(Callable<T> c, T def) { try { return c.call(); } catch (Exception e) { return def; } }
 
     private int updateContent(int row, Path d, String type, Supplier<List<ModScanner.Mod>> scanner, Function<ModScanner.Mod, Api.CheckResult> checker) {
         var items = scanner.get();
@@ -132,33 +133,39 @@ public class Updater {
         String jarName = cfg.serverJar != null ? cfg.serverJar : loader.findServerJar(dir);
         Path jar = dir.resolve(jarName);
         if (!Files.exists(jar)) { con.fail("Server JAR missing"); return false; }
+        Process p = null;
         try {
             ProcessBuilder pb;
             if (jarName.endsWith(".bat")) pb = new ProcessBuilder("cmd", "/c", jar.toString());
             else if (jarName.endsWith(".sh")) pb = new ProcessBuilder("bash", jar.toString());
             else pb = new ProcessBuilder("java", "-Xmx1G", "-jar", jar.toString(), "nogui");
-            var p = pb.directory(dir.toFile()).redirectErrorStream(true).start();
-            var rd = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            long start = System.currentTimeMillis(); boolean ok = false;
-            while (System.currentTimeMillis() - start < cfg.startupTimeout * 1000L) {
-                if (rd.ready()) { String l = rd.readLine(); if (l != null && (l.contains("Done (") || l.contains("For help, type"))) { ok = true; break; } }
-                if (!p.isAlive()) break; Thread.sleep(100);
+            p = pb.directory(dir.toFile()).redirectErrorStream(true).start();
+            boolean ok = false;
+            try (var rd = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                long start = System.currentTimeMillis();
+                while (System.currentTimeMillis() - start < cfg.startupTimeout * 1000L) {
+                    if (rd.ready()) { String l = rd.readLine(); if (l != null && (l.contains("Done (") || l.contains("For help, type"))) { ok = true; break; } }
+                    if (!p.isAlive()) break; Thread.sleep(100);
+                }
             }
             if (p.isAlive()) { p.destroyForcibly(); p.waitFor(5, TimeUnit.SECONDS); }
             if (ok) con.checkDone("ok", true); else con.fail("Server failed to start");
             return ok;
         } catch (Exception e) { con.fail("Startup error: " + e.getMessage()); return false; }
+        finally { if (p != null && p.isAlive()) p.destroyForcibly(); }
     }
 
     private boolean checkJava() {
+        Process p = null;
         try {
-            var p = new ProcessBuilder("java", "-version").redirectErrorStream(true).start();
-            String out = new String(p.getInputStream().readAllBytes());
-            p.waitFor();
+            p = new ProcessBuilder("java", "-version").redirectErrorStream(true).start();
+            String out; try (var is = p.getInputStream()) { out = new String(is.readAllBytes()); }
+            p.waitFor(5, TimeUnit.SECONDS);
             var m = java.util.regex.Pattern.compile("version \"(\\d+)").matcher(out);
             if (m.find()) return Integer.parseInt(m.group(1)) >= 21;
             return false;
         } catch (Exception e) { return false; }
+        finally { if (p != null) p.destroyForcibly(); }
     }
     private boolean checkDisk() { try { long mb = Files.getFileStore(dir).getUsableSpace() / (1024 * 1024); if (mb < 500) { con.fail("Need 500MB free (" + mb + "MB available)"); return false; } if (mb < 1000) con.warn("Low disk: " + mb + "MB"); return true; } catch (IOException e) { return true; } }
     private void initDirs() { try { Files.createDirectories(dir.resolve("mods")); } catch (IOException e) {} }
@@ -171,7 +178,11 @@ public class Updater {
         return null;
     }
 
-    private void writeVersion(String v) { try { Files.writeString(dir.resolve("current_version.txt"), v); } catch (IOException e) {} }
+    private void writeVersion(String v) {
+        Path vf = dir.resolve("current_version.txt"), tmp = dir.resolve("current_version.txt.tmp");
+        try { Files.writeString(tmp, v); Files.move(tmp, vf, StandardCopyOption.REPLACE_EXISTING); }
+        catch (IOException e) { try { Files.deleteIfExists(tmp); } catch (IOException e2) {} con.warn("Failed to save version"); }
+    }
     private void cleanOld(String keep) {
         Path d = dir.resolve("versions"); if (!Files.exists(d)) return;
         try (var s = Files.list(d)) {
@@ -181,4 +192,33 @@ public class Updater {
         } catch (IOException e) {}
     }
     private String getWorldName() { Path p = dir.resolve("server.properties"); if (Files.exists(p)) try { for (String l : Files.readAllLines(p)) if (l.startsWith("level-name=")) return l.substring(11).trim(); } catch (IOException e) {} return "world"; }
+
+    private void checkIntegrity() {
+        Path mods = dir.resolve("mods");
+        if (!Files.exists(mods)) return;
+        try (var s = Files.list(mods)) {
+            for (Path p : s.filter(f -> f.toString().endsWith(".jar")).toList()) {
+                if (Files.size(p) == 0) con.warn("Empty file: " + p.getFileName());
+            }
+        } catch (IOException e) {}
+    }
+
+    // pending operation marker for crash recovery
+    private Path pendingFile() { return dir.resolve("woflo").resolve(".pending"); }
+    private void writePending() { try { Files.writeString(pendingFile(), "update"); } catch (IOException e) {} }
+    private void clearPending() { try { Files.deleteIfExists(pendingFile()); } catch (IOException e) {} }
+    private boolean checkPending() {
+        Path p = pendingFile();
+        if (!Files.exists(p)) return false;
+        con.warn("Previous update interrupted - rolling back");
+        Path backups = dir.resolve("woflo").resolve("backups");
+        if (Files.exists(backups)) {
+            try (var s = Files.list(backups)) {
+                var latest = s.filter(Files::isDirectory).max(Comparator.comparing(x -> x.getFileName().toString()));
+                if (latest.isPresent() && Backup.restore(latest.get(), dir, loader, con)) { clearPending(); return false; }
+            } catch (IOException e) {}
+        }
+        con.fail("Cannot recover - manual intervention required");
+        return true;
+    }
 }

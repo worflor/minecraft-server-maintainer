@@ -46,9 +46,6 @@ cd build/optimized
 jar cfm "../server maintainer by woflo.jar" ../MANIFEST.MF .
 cd ../..
 
-# Copy
-cp "build/server maintainer by woflo.jar" "../server maintainer by woflo.jar"
-
 # Show sizes
 echo
 echo "Size comparison:"

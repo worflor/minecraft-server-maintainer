@@ -106,4 +106,4 @@ After running once, `mods/mods.txt` (or `plugins/plugins.txt`, `datapacks/datapa
 
 ## License
 
-MIT
+GPL-3.0

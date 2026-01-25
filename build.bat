@@ -50,9 +50,6 @@ cd build\optimized
 jar cfm "..\server maintainer by woflo.jar" ..\MANIFEST.MF .
 cd ..\..
 
-:: Copy to parent
-copy "build\server maintainer by woflo.jar" "..\server maintainer by woflo.jar" >nul
-
 :: Show size comparison
 echo.
 echo Size comparison:

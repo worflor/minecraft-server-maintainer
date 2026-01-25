@@ -1,8 +1,8 @@
 <h1 align="center">Server Maintainer, by woflo</h1>
 
 <p align="center">
-  <b>Hands-off Minecraft server updates</b><br>
-  Keeps your server, mods, plugins, and datapacks up to date automatically.
+  <b>Let your server take care of itself</b><br>
+  Updates Minecraft, mods, plugins, and datapacks automatically so you don't have to.
 </p>
 
 <p align="center">
@@ -26,18 +26,20 @@
 
 ## What It Does
 
-**Replaces your `run.bat`.** Run this instead and it'll check for updates, apply them, then start your server.
+**Replace your `run.bat` with this.** Double-click once and your server handles the rest, checking for updates, installing them safely, and keeping everything running smoothly.
 
-Before updating Minecraft it creates a backup. After any update it verifies the server boots. If something breaks after a Minecraft update, it rolls back.
+Before any Minecraft update, it creates a backup. After updating, it makes sure your server still starts. If something goes wrong, it automatically rolls back to the working version.
 
 ## Quick Start
 
-**Requirements:** Java 21+, an existing Minecraft server
+**What you need:** Java 21+ and an existing Minecraft server
 
-1. Drop `server maintainer by woflo.jar` in your server folder
+**Getting started is simple:**
+
+1. Put `server maintainer by woflo.jar` in your server folder
 2. Double-click it
 
-First run creates a config at `woflo/woflo.yml`. After that it just works.
+That's it. The first run creates a config file at `woflo/woflo.yml`. From then on, it just works.
 
 ## Features
 
@@ -67,53 +69,63 @@ java -jar "server maintainer by woflo.jar" [options]
 
 ## Configuration
 
-Created at `woflo/woflo.yml` on first run:
+The first time you run it, Server Maintainer creates a config file at `woflo/woflo.yml`. This is where you can customize how everything works. Here's what each setting does:
 
 ```yaml
 memory:
-  min: 2G
-  max: 6G
+  min: 2G    # Minimum RAM for your server
+  max: 6G    # Maximum RAM for your server
 
 updates:
-  minecraft: true         # Minecraft + mod loader
-  mods: true              # Mods from Modrinth
-  plugins: true           # Plugins from Modrinth
-  datapacks: false        # Datapacks from Modrinth
-  min-compatibility: 60   # % of mods needed for MC update
-  allow-snapshots: false  # Include MC snapshots
-  allow-beta: false       # Include beta mods/plugins
+  minecraft: true         # Update Minecraft and your mod loader
+  mods: true              # Update mods from Modrinth
+  plugins: true           # Update plugins from Modrinth  
+  datapacks: false        # Update datapacks from Modrinth
+  min-compatibility: 60   # Only update Minecraft when this % of your mods support the new version
+  allow-snapshots: false  # Include Minecraft snapshot versions
+  allow-beta: false       # Include beta versions of mods/plugins
 
-startup-timeout: 90       # Seconds to wait for startup
-interactive: false        # Prompt before updates
+startup-timeout: 90       # How many seconds to wait for your server to start
+interactive: false        # Ask before updating (set to true to enable prompts)
 
-# Crash recovery
-restart-delay: 5          # Seconds before restart
-max-crashes: 3            # Crashes before cooldown
-crash-window: 300         # Window for counting crashes
+# Crash recovery settings
+restart-delay: 5          # Seconds to wait before restarting after a crash
+max-crashes: 3            # How many crashes before we stop trying to restart
+crash-window: 300         # Time window (in seconds) for counting crashes
 
-# Optional
-# target-version: 1.21.0  # Lock to specific MC version
-# server-jar: server.jar  # Override auto-detection
+# Optional settings you can add:
+# target-version: 1.21.0  # Lock to a specific Minecraft version
+# server-jar: server.jar  # Override automatic server jar detection
 ```
 
 ## Skipping Updates
 
-Works the same for mods, plugins, and datapacks.
+Want to keep a specific mod, plugin, or datapack at its current version? No problem. After your first run, Server Maintainer creates a text file listing everything it found:
 
-After first run, check `mods/mods.txt` (or `plugins/plugins.txt`, `datapacks/datapacks.txt`). Prefix a filename with `#` to skip it:
+- Mods: `mods/mods.txt`
+- Plugins: `plugins/plugins.txt`  
+- Datapacks: `datapacks/datapacks.txt`
+
+Just add a `#` in front of any filename you want to skip:
 
 ```
-# sodium-0.5.8.jar
-lithium-0.12.1.jar
+# sodium-0.5.8.jar    # This won't be updated
+lithium-0.12.1.jar    # This will be updated
 ```
+
+Works the same way for all three types.
 
 ## Backups
 
-Created before Minecraft updates. Stored in `woflo/backups/`, named like `20250125-143022_mc`. Cleaned after 7 days.
+Before any Minecraft update, Server Maintainer creates a full backup of your server. These live in `woflo/backups/` with names like `20250125-143022_mc` (that's year-month-day-hour-minute-second, so you can always find the one you need).
 
-Restore manually with `--rollback`.
+Backups automatically clean themselves up after 7 days, so you don't have to worry about them piling up.
+
+Need to roll back? Just run with `--rollback` and you'll be back to your most recent backup in seconds.
 
 ## How It Works
+
+Here's what happens behind the scenes every time you run Server Maintainer:
 
 ```
 ┌─────────────────┐

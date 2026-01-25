@@ -39,7 +39,7 @@ Before any Minecraft update, it creates a backup. After updating, it makes sure 
 1. Put `server maintainer by woflo.jar` in your server folder
 2. Double-click it
 
-That's it. The first run creates a config file at `woflo/woflo.yml`. From then on, it just works.
+That's it. The first run creates a config file at `woflo/config.yml`. From then on, it just works.
 
 ## Features
 
@@ -69,7 +69,7 @@ java -jar "server maintainer by woflo.jar" [options]
 
 ## Configuration
 
-The first time you run it, Server Maintainer creates a config file at `woflo/woflo.yml`. This is where you can customize how everything works. Here's what each setting does:
+The first time you run it, Server Maintainer creates a config file at `woflo/config.yml`. This is where you can customize how everything works. Here's what each setting does:
 
 ```yaml
 memory:

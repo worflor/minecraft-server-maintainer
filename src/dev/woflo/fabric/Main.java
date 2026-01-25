@@ -121,7 +121,7 @@ public class Main {
               -y, --yes          Skip prompts (overrides config)
               -h, --help         Show this help
 
-            Files: woflo/woflo.yml (config), mods/mods.txt (skip mods)
+            Files: woflo/config.yml (config), mods/mods.txt (skip mods)
             """);
     }
 }

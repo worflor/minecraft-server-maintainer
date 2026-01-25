@@ -51,7 +51,7 @@ public enum Loader {
                 .filter(n -> !n.contains("installer"))
                 .toList();
             if (jars.size() == 1) return jars.get(0);
-            if (jars.size() > 1) throw new RuntimeException("Too many server JARs! I'm getting confused. Set 'server-jar' in woflo.yml or remove the extras to help me out:\n  - " + String.join("\n  - ", jars));
+            if (jars.size() > 1) throw new RuntimeException("Too many server JARs! I'm getting confused. Set 'server-jar' in config.yml or remove the extras to help me out:\n  - " + String.join("\n  - ", jars));
         } catch (IOException e) {}
         // Forge/NeoForge run scripts
         if ((this == FORGE || this == NEOFORGE) && (Files.exists(dir.resolve("run.bat")) || Files.exists(dir.resolve("run.sh")))) {

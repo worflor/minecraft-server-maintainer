@@ -886,7 +886,7 @@ try (var ex = Executors.newVirtualThreadPerTaskExecutor()) {
 ```
 server/
 ├── woflo/
-│   ├── woflo.yml                    # Configuration file
+│   ├── config.yml                   # Configuration file
 │   ├── update.log                   # Update history log
 │   └── backups/
 │       ├── 20250125-143022_mc/      # Backup before MC update

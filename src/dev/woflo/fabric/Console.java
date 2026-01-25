@@ -84,7 +84,8 @@ public class Console {
     public void countdown() {
         hideCursor();
         for (int i = 30; i >= 0; i--) {
-            System.out.print((i == 30 ? "\n  " : "\r  ") + p(BLK.repeat(i * 52 / 30)) + " ".repeat(52 - i * 52 / 30));
+            double t = i / 30.0; int w = (int)(t * t * 52); // ease-out
+            System.out.print((i == 30 ? "\n  " : "\r  ") + p(BLK.repeat(w)) + " ".repeat(52 - w));
             System.out.flush();
             sleep(50);
         }

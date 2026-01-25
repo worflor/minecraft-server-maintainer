@@ -36,7 +36,7 @@ public class Api {
             }
             if (versions == null || versions.isEmpty()) return new CheckResult(mod.id(), mod.path(), "skip", oldVer, null, null, null, null);
 
-            // Find first version matching allowed types (release, or release+beta if allowBeta)
+            // prefer release, allow beta if enabled
             Map<String, Object> latest = null;
             for (var v : versions) {
                 @SuppressWarnings("unchecked") var ver = (Map<String, Object>) v;

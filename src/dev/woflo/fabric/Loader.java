@@ -42,7 +42,7 @@ public enum Loader {
     public String findServerJar(Path dir) {
         String expected = serverJar();
         if (Files.exists(dir.resolve(expected))) return expected;
-        // Look for any JAR containing the loader name
+        // fallback: search by name
         String search = switch (this) { case FABRIC -> "fabric"; case QUILT -> "quilt"; case FORGE -> "forge"; case NEOFORGE -> "neoforge"; case VANILLA -> "server"; };
         try (var s = Files.list(dir)) {
             var jars = s.filter(p -> p.toString().endsWith(".jar"))

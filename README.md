@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/screenshot.webp" alt="Server Maintainer in action" width="600">
+  <img src="assets/screenshot.webp" alt="Server Maintainer" width="600">
 </p>
 
 ## What It Does
@@ -124,6 +124,10 @@ Backups automatically clean themselves up after 7 days, so you don't have to wor
 Need to roll back? Just run with `--rollback` and you'll be back to your most recent backup in seconds.
 
 ## How It Works
+
+<p align="center">
+  <img src="assets/demo.gif" alt="Server Maintainer in action" width="600">
+</p>
 
 Here's what happens behind the scenes every time you run Server Maintainer:
 

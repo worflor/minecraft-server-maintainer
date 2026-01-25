@@ -10,6 +10,7 @@ public class Console {
     private static final String E = "\u001B[31m", A = "\u001B[90m", W = "\u001B[97m", UP = "\u001B[A", CL = "\u001B[2K";
     private static final String H = "\u2500", V = "\u2502", TL = "\u250C", TR = "\u2510", BL = "\u2514", BR = "\u2518";
     private static final String CHK = "\u221A", BLK = "\u2588", SHD = "\u2591";
+    private static final int HEADER_WIDTH = 48, BAR_WIDTH = 16, COUNTDOWN_WIDTH = 52, COUNTDOWN_FRAMES = 30;
 
     private final PrintWriter log;
     private final boolean c;
@@ -36,10 +37,10 @@ public class Console {
 
     public void header(String loader, String ver) {
         String title = "  Server Maintainer", brand = "woflo  ", sub = "  " + loader + " " + ver;
-        System.out.println("\n  " + p(TL + H.repeat(48) + TR));
-        System.out.println("  " + p(V) + w(title) + " ".repeat(48 - title.length() - brand.length()) + a(brand) + p(V));
-        System.out.println("  " + p(V) + a(sub) + " ".repeat(48 - sub.length()) + p(V));
-        System.out.println("  " + p(BL + H.repeat(48) + BR) + "\n");
+        System.out.println("\n  " + p(TL + H.repeat(HEADER_WIDTH) + TR));
+        System.out.println("  " + p(V) + w(title) + " ".repeat(HEADER_WIDTH - title.length() - brand.length()) + a(brand) + p(V));
+        System.out.println("  " + p(V) + a(sub) + " ".repeat(HEADER_WIDTH - sub.length()) + p(V));
+        System.out.println("  " + p(BL + H.repeat(HEADER_WIDTH) + BR) + "\n");
     }
 
     public void dryRun() { System.out.println("  " + a("(dry run)") + "\n"); }
@@ -62,8 +63,8 @@ public class Console {
     }
 
     public void rowProgress(int i, int done, int total) {
-        int f = total > 0 ? (done * 16 / total) : 0;
-        upd(i, p(BLK), a("[") + p(BLK.repeat(f) + SHD.repeat(16 - f)) + a("] ") + w(done + "/" + total));
+        int f = total > 0 ? (done * BAR_WIDTH / total) : 0;
+        upd(i, p(BLK), a("[") + p(BLK.repeat(f) + SHD.repeat(BAR_WIDTH - f)) + a("] ") + w(done + "/" + total));
     }
 
     public void rowDone(int i, String v) { upd(i, g(BLK), w(v) + " " + g(CHK)); log("OK", labels.get(i) + " " + v); }
@@ -84,13 +85,13 @@ public class Console {
 
     public void countdown() {
         hideCursor();
-        for (int i = 30; i >= 0; i--) {
-            double t = i / 30.0; int w = (int)(t * t * 52); // ease-out
-            System.out.print((i == 30 ? "\n  " : "\r  ") + p(BLK.repeat(w)) + " ".repeat(52 - w));
+        for (int i = COUNTDOWN_FRAMES; i >= 0; i--) {
+            double t = i / (double) COUNTDOWN_FRAMES; int w = (int)(t * t * COUNTDOWN_WIDTH);
+            System.out.print((i == COUNTDOWN_FRAMES ? "\n  " : "\r  ") + p(BLK.repeat(w)) + " ".repeat(COUNTDOWN_WIDTH - w));
             System.out.flush();
             sleep(50);
         }
-        System.out.print("\r" + " ".repeat(56) + "\r"); showCursor();
+        System.out.print("\r" + " ".repeat(COUNTDOWN_WIDTH + 4) + "\r"); showCursor();
     }
 
     public void hideCursor() { if (c) System.out.print("\u001B[?25l"); }

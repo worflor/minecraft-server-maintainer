@@ -16,7 +16,7 @@ public class Main {
         Boolean interactiveFlag = null; // null = use config, true = force interactive, false = force automated
         for (String a : args) { switch (a) { case "--dry-run", "-d" -> dryRun = true; case "--update-only", "-u" -> updateOnly = true; case "--rollback", "-r" -> rollback = true; case "--interactive", "-i" -> interactiveFlag = true; case "--yes", "-y" -> interactiveFlag = false; case "--help", "-h" -> { printHelp(); return; } } }
 
-        try { serverDir = Path.of(Main.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getParent(); } catch (Exception e) {}
+        try { serverDir = Path.of(Main.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getParent(); } catch (Exception ignored) {}
         if (serverDir == null) serverDir = Path.of(".").toAbsolutePath();
         if (serverDir.getFileName().toString().equals("woflo")) serverDir = serverDir.getParent(); // support running from woflo/ folder
 
@@ -73,7 +73,19 @@ public class Main {
                 int exit = proc.waitFor();
                 proc = null;
                 long run = System.currentTimeMillis() - start;
-                if (exit == 0 || run > windowMs) { crashes = new long[config.maxCrashes]; System.out.println("\nServer stopped. Restarting in " + config.restartDelay + " seconds...\n"); Thread.sleep(delayMs); continue; }
+                if (exit == 0 || run > windowMs) {
+                    crashes = new long[config.maxCrashes];
+                    System.out.println("\nServer stopped.");
+                    if (config.stasisEnabled && Backup.stasisDue(serverDir, config.stasisInterval)) {
+                        Backup.createStasis(serverDir, console);
+                        Backup.cleanupStasis(serverDir, config.stasisKeep);
+                        System.out.println("Restarting...\n");
+                    } else {
+                        System.out.println("Restarting in " + config.restartDelay + " seconds...\n");
+                        Thread.sleep(delayMs);
+                    }
+                    continue;
+                }
                 crashes[ci] = System.currentTimeMillis(); ci = (ci + 1) % config.maxCrashes;
                 int recent = 0; long now = System.currentTimeMillis(); for (long t : crashes) if (t > 0 && now - t < windowMs) recent++;
                 if (recent >= config.maxCrashes) { console.fail("Server crashed " + config.maxCrashes + " times in " + (config.crashWindow / 60) + " minutes"); console.warn("Check logs. Waiting " + (config.crashWindow / 60) + " minutes..."); crashes = new long[config.maxCrashes]; Thread.sleep(windowMs); }
@@ -104,9 +116,9 @@ public class Main {
             ProcessBuilder pb;
             if (os.contains("win")) pb = new ProcessBuilder("cmd", "/c", "start", "cmd", "/k", "java", "-jar", jar, "--no-relaunch");
             else if (os.contains("mac")) pb = new ProcessBuilder("open", "-a", "Terminal", Path.of(jar).getParent().toString());
-            else { for (String t : new String[]{"gnome-terminal", "konsole", "xfce4-terminal", "xterm"}) { try { if (new ProcessBuilder("which", t).start().waitFor() == 0) { pb = new ProcessBuilder(t, "-e", "java", "-jar", jar, "--no-relaunch"); pb.start(); return true; } } catch (Exception e) {} } return false; }
+            else { for (String t : new String[]{"gnome-terminal", "konsole", "xfce4-terminal", "xterm"}) { try { if (new ProcessBuilder("which", t).start().waitFor() == 0) { pb = new ProcessBuilder(t, "-e", "java", "-jar", jar, "--no-relaunch"); pb.start(); return true; } } catch (Exception ignored) {} } return false; }
             pb.start(); return true;
-        } catch (Exception e) { return false; }
+        } catch (Exception ignored) { return false; }
     }
 
     private static void printHelp() {

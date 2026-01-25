@@ -1,15 +1,17 @@
 package dev.woflo.fabric;
 
-import java.io.*;
-import java.nio.file.*;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.*;
 
 public class Api {
+    private static final String MOJANG_MANIFEST = "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json";
+    private static final String MODRINTH_API = "https://api.modrinth.com/v2";
     public static String getLatestMinecraft(boolean allowSnapshots) {
         try {
-            var latest = Http.obj(Http.getJson("https://launchermeta.mojang.com/mc/game/version_manifest_v2.json"), "latest");
+            var latest = Http.obj(Http.getJson(MOJANG_MANIFEST), "latest");
             return Http.str(latest, allowSnapshots ? "snapshot" : "release");
-        } catch (Exception e) { return null; }
+        } catch (Exception ignored) { return null; }
     }
 
     public record CheckResult(String id, Path path, String status, String oldVersion, String newVersion, String downloadUrl, String sha512, String fileName) {}
@@ -26,14 +28,15 @@ public class Api {
         try {
             String hash = Http.sha512(mod.path());
             Map<String, Object> current;
-            try { current = Http.getJson("https://api.modrinth.com/v2/version_file/" + hash); }
-            catch (IOException e) { return skip(mod, null); }
+            try { current = Http.getJson(MODRINTH_API + "/version_file/" + hash); }
+            catch (IOException ignored) { return skip(mod, null); }
 
             String projectId = Http.str(current, "project_id"), oldVer = Http.str(current, "version_number");
             List<Object> versions = null;
             for (String l : loaders) {
-                versions = Http.getJsonArray("https://api.modrinth.com/v2/project/" + Http.encode(projectId) + "/version?game_versions=" +
-                    Http.encode("[\"" + mcVersion + "\"]") + "&loaders=" + Http.encode("[\"" + l + "\"]"));
+                versions = Http.getJsonArray(MODRINTH_API + "/project/" + Http.encode(projectId) +
+                    "/version?game_versions=" + Http.encode("[\"" + mcVersion + "\"]") +
+                    "&loaders=" + Http.encode("[\"" + l + "\"]"));
                 if (versions != null && !versions.isEmpty()) break;
             }
             if (versions == null || versions.isEmpty()) return skip(mod, oldVer);
@@ -56,6 +59,8 @@ public class Api {
             if (oldVer != null && oldVer.equals(newVer)) return new CheckResult(mod.id(), mod.path(), "current", oldVer, newVer, null, null, null);
             var hashes = Http.obj(file, "hashes");
             return new CheckResult(mod.id(), mod.path(), "update", oldVer, newVer, Http.str(file, "url"), hashes != null ? Http.str(hashes, "sha512") : null, Http.str(file, "filename"));
-        } catch (Exception ignored) { return skip(mod, null); }
+        } catch (Exception ignored) {
+            return skip(mod, null);
+        }
     }
 }

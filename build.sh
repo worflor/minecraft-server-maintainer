@@ -5,6 +5,9 @@ echo
 
 cd "$(dirname "$0")"
 
+# Read version from VERSION file
+VERSION=$(cat VERSION | tr -d '\r\n')
+
 # Use Java 21 explicitly (Minecraft requires Java 21)
 JAVA_HOME=""
 for base in "/c/Program Files/Eclipse Adoptium/jdk-21" "/c/Program Files/Java/jdk-21" "/c/Program Files/OpenJDK/jdk-21" "/c/Program Files/Microsoft/jdk-21" "/c/Program Files/Amazon Corretto/jdk21" "/c/Program Files/Zulu/zulu-21" "/usr/lib/jvm/java-21" "/usr/lib/jvm/jdk-21"; do
@@ -41,20 +44,17 @@ if [ $? -ne 0 ]; then echo "Optimization failed!"; exit 1; fi
 
 # Package
 echo "Packaging..."
-cat > build/MANIFEST.MF << 'EOF'
+cat > build/MANIFEST.MF << EOF
+Manifest-Version: 1.0
 Main-Class: dev.woflo.fabric.Main
-Implementation-Title: Server Maintainer
-Implementation-Version: 1.0.0
-Implementation-Vendor: woflo
+Implementation-Version: $VERSION
 EOF
 cd build/optimized
-jar cfm "../server maintainer by woflo.jar" ../MANIFEST.MF .
+jar cfm "../server maintainer by woflo $VERSION.jar" ../MANIFEST.MF .
 cd ../..
 
 # Show sizes
 echo
-echo "Size comparison:"
-du -b build/classes/dev/woflo/fabric/*.class 2>/dev/null | awk '{sum+=$1} END {print "Original classes: " sum " bytes"}'
-stat --printf="Final JAR: %s bytes\n" "build/server maintainer by woflo.jar" 2>/dev/null || stat -f "Final JAR: %z bytes" "build/server maintainer by woflo.jar"
+stat --printf="Final JAR: %s bytes\n" "build/server maintainer by woflo $VERSION.jar" 2>/dev/null || stat -f "Final JAR: %z bytes" "build/server maintainer by woflo $VERSION.jar"
 echo
-echo "Done!"
+echo "Done! [v$VERSION]"

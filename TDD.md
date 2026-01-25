@@ -1,7 +1,7 @@
 # Technical Design Document (TDD)
 ## Server Maintainer by woflo
 
-**Version:** 1.0.0
+**Version:** 1.0.1
 **Last Updated:** 2026-01-25
 **Architecture:** Zero-dependency Java 21+ CLI Application
 
@@ -110,22 +110,22 @@ The tool embodies a "set it and forget it" approach. Users should be able to:
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| Main.java | 127 | Entry, CLI, server lifecycle |
-| Updater.java | 185 | Core update orchestration |
-| Loader.java | 163 | Mod loader abstraction |
-| Config.java | 103 | Configuration parsing |
-| Console.java | 98 | Terminal UI/logging |
-| Http.java | 157 | HTTP client + JSON parser |
-| Api.java | 59 | Modrinth API wrapper |
-| Backup.java | 71 | Backup/restore system |
-| ModScanner.java | 61 | Mod file scanning |
-| **Total** | **~1024** | |
+| Main.java | 142 | Entry, CLI, server lifecycle |
+| Updater.java | 225 | Core update orchestration |
+| Loader.java | 161 | Mod loader abstraction |
+| Config.java | 175 | Configuration parsing |
+| Console.java | 101 | Terminal UI/logging |
+| Http.java | 159 | HTTP client + JSON parser |
+| Api.java | 61 | Modrinth API wrapper |
+| Backup.java | 145 | Backup/restore + stasis snapshots |
+| ModScanner.java | 65 | Mod file scanning |
+| **Total** | **~1234** | |
 
 ---
 
 ## Component Deep Dive
 
-### Main.java (Lines 1-127)
+### Main.java (Lines 1-142)
 
 **Responsibilities:**
 - Entry point and CLI argument parsing
@@ -162,7 +162,9 @@ maxCrashes = 3
 
 On server exit:
   if exit == 0 OR runtime > window:
-    reset crashes[], restart after delay
+    reset crashes[]
+    if stasisEnabled && stasisDue: createStasis()
+    restart (immediately after stasis, or after delay)
   else:
     record crash timestamp
     count recent crashes (within window)
@@ -174,7 +176,7 @@ On server exit:
 
 ---
 
-### Updater.java (Lines 1-185)
+### Updater.java (Lines 1-225)
 
 **Responsibilities:**
 - Orchestrates entire update process
@@ -312,7 +314,7 @@ VANILLA → []                      // No mod support
 
 ---
 
-### Config.java (Lines 1-103)
+### Config.java (Lines 1-175)
 
 **Responsibilities:**
 - Parse YAML configuration without external libraries
@@ -333,13 +335,16 @@ VANILLA → []                      // No mod support
 | `allowSnapshots` | boolean | false | Include MC snapshots |
 | `allowBeta` | boolean | false | Include beta versions (global) |
 | `interactive` | boolean | false | Prompt before updates |
-| `minCompatibility` | int | 60 | Min % mods must support new MC |
+| `minCompatibility` | int | 90 | Min % mods must support new MC |
 | `startupTimeout` | int | 90 | Seconds to wait for startup verify |
 | `restartDelay` | int | 5 | Seconds before restart |
 | `maxCrashes` | int | 3 | Max crashes before cooldown |
 | `crashWindow` | int | 300 | Crash tracking window (seconds) |
 | `targetVersion` | String | null | Lock to specific MC version |
 | `serverJar` | String | null | Override JAR auto-detection |
+| `stasisEnabled` | boolean | false | Enable full server snapshots |
+| `stasisInterval` | int | 24 | Hours between stasis snapshots |
+| `stasisKeep` | int | 3 | Number of stasis snapshots to keep |
 
 **Default JVM Arguments:**
 ```java
@@ -535,12 +540,14 @@ DATAPACK_LOADERS = ["datapack"]
 
 ---
 
-### Backup.java (Lines 1-71)
+### Backup.java (Lines 1-145)
 
 **Responsibilities:**
-- Create backups before updates
+- Create incremental backups before updates
 - Restore from backup on failure
 - Auto-cleanup old backups
+- Create full stasis snapshots (compressed ZIP)
+- Manage stasis retention
 
 **Backup Naming:**
 ```
@@ -552,10 +559,13 @@ woflo/backups/YYYYMMDD-HHmmss_reason/
 
 | Method | Lines | Description |
 |--------|-------|-------------|
-| `create(Path, Loader, String, Console)` | 10-22 | Create timestamped backup |
-| `restore(Path, Path, Loader, Console)` | 24-42 | Restore backup with rollback on error |
-| `cleanup(Path, int)` | 44-54 | Delete backups older than N days |
-| `del(Path)` | 64-70 | Recursive directory delete |
+| `create(Path, Loader, String, Console)` | 18-30 | Create timestamped backup |
+| `restore(Path, Path, Loader, Console)` | 32-50 | Restore backup with rollback on error |
+| `cleanup(Path, int)` | 52-62 | Delete backups older than N days |
+| `stasisDue(Path, int)` | 82-89 | Check if stasis snapshot needed |
+| `createStasis(Path, Console)` | 91-113 | Create full compressed snapshot |
+| `cleanupStasis(Path, int)` | 131-138 | Retain only N most recent stasis |
+| `del(Path)` | 72-78 | Recursive directory delete |
 
 **Backup Contents (per Loader):**
 
@@ -888,14 +898,11 @@ server/
 ├── woflo/
 │   ├── config.yml                   # Configuration file
 │   ├── update.log                   # Update history log
-│   └── backups/
-│       ├── 20250125-143022_mc/      # Backup before MC update
-│       │   ├── mods/
-│       │   ├── versions/
-│       │   ├── libraries/
-│       │   ├── fabric-server-launch.jar
-│       │   └── current_version.txt
-│       └── ...
+│   ├── .pending                     # Crash recovery marker (if interrupted)
+│   ├── backups/
+│   │   └── 20250125-143022_mc/      # Backup before MC update
+│   └── stasis/
+│       └── 20250125-180000.zip      # Full server snapshot (optional)
 ├── mods/
 │   ├── mods.txt                     # Mod list with skip markers
 │   ├── sodium-fabric-0.5.4.jar
@@ -1084,6 +1091,8 @@ public class Config {
     public int restartDelay, maxCrashes, crashWindow;
     public String targetVersion, serverJar;
     public static final int BACKUP_KEEP_DAYS = 7;
+    public boolean stasisEnabled;
+    public int stasisInterval, stasisKeep;
 
     // Methods
     public static Config load(Path dir)     // Load or create config
@@ -1188,6 +1197,9 @@ public class Backup {
     public static Path create(Path serverDir, Loader, String reason, Console)
     public static boolean restore(Path backupDir, Path serverDir, Loader, Console)
     public static void cleanup(Path serverDir, int keepDays)
+    public static boolean stasisDue(Path serverDir, int intervalHours)
+    public static void createStasis(Path serverDir, Console)
+    public static void cleanupStasis(Path serverDir, int keep)
     public static void del(Path p)                   // Recursive delete
 }
 ```

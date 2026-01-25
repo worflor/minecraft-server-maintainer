@@ -8,6 +8,12 @@ import java.util.zip.*;
 public enum Loader {
     FABRIC, FORGE, NEOFORGE, QUILT, VANILLA;
 
+    private static final String FABRIC_META = "https://meta.fabricmc.net/v2";
+    private static final String QUILT_META = "https://meta.quiltmc.org/v3";
+    private static final String FORGE_META = "https://files.minecraftforge.net";
+    private static final String NEOFORGE_META = "https://maven.neoforged.net";
+    private static final String MOJANG_META = "https://launchermeta.mojang.com";
+
     public static Loader detect(Path dir) {
         if (Files.exists(dir.resolve("fabric-server-launch.jar")) || Files.exists(dir.resolve(".fabric"))) return FABRIC;
         Path mods = dir.resolve("mods");
@@ -15,12 +21,12 @@ public enum Loader {
             try (var s = Files.list(mods)) {
                 for (Path p : s.filter(f -> f.toString().endsWith(".jar")).toList()) {
                     String d = detectFromMod(p);
-                    var l = switch (d) { case "fabric" -> FABRIC; case "forge" -> FORGE; case "neoforge" -> NEOFORGE; case "quilt" -> QUILT; default -> (Loader) null; };
+                    Loader l = switch (d) { case "fabric" -> FABRIC; case "forge" -> FORGE; case "neoforge" -> NEOFORGE; case "quilt" -> QUILT; default -> null; };
                     if (l != null) return l;
                 }
-            } catch (IOException e) {}
+            } catch (IOException ignored) {}
         }
-        try (var s = Files.list(dir)) { if (s.anyMatch(p -> p.getFileName().toString().toLowerCase().contains("forge") && p.toString().endsWith(".jar"))) return FORGE; } catch (IOException e) {}
+        try (var s = Files.list(dir)) { if (s.anyMatch(p -> p.getFileName().toString().toLowerCase().contains("forge") && p.toString().endsWith(".jar"))) return FORGE; } catch (IOException ignored) {}
         if (Files.exists(dir.resolve("server.jar")) && (!Files.exists(mods) || isEmpty(mods))) return VANILLA;
         return FABRIC;
     }
@@ -33,7 +39,7 @@ public enum Loader {
             if (z.getEntry("quilt.mod.json") != null) return "quilt";
             if (z.getEntry("META-INF/mods.toml") != null) return "forge";
             if (z.getEntry("META-INF/neoforge.mods.toml") != null) return "neoforge";
-        } catch (IOException e) {}
+        } catch (IOException ignored) {}
         return null;
     }
 
@@ -52,7 +58,7 @@ public enum Loader {
                 .toList();
             if (jars.size() == 1) return jars.get(0);
             if (jars.size() > 1) throw new RuntimeException("Too many server JARs! I'm getting confused. Set 'server-jar' in config.yml or remove the extras to help me out:\n  - " + String.join("\n  - ", jars));
-        } catch (IOException e) {}
+        } catch (IOException ignored) {}
         // Forge/NeoForge run scripts
         if ((this == FORGE || this == NEOFORGE) && (Files.exists(dir.resolve("run.bat")) || Files.exists(dir.resolve("run.sh")))) {
             return System.getProperty("os.name").toLowerCase().contains("win") ? "run.bat" : "run.sh";
@@ -66,18 +72,22 @@ public enum Loader {
 
     public boolean isReady(String mc) {
         try { return switch (this) {
-            case FABRIC -> !Http.getJsonArray("https://meta.fabricmc.net/v2/versions/loader/" + mc).isEmpty();
-            case QUILT -> !Http.getJsonArray("https://meta.quiltmc.org/v3/versions/loader/" + mc).isEmpty();
-            case FORGE -> Http.obj(Http.getJson("https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json"), "promos").containsKey(mc + "-latest");
-            case NEOFORGE -> { String[] p = mc.split("\\."); String pfx = (p.length >= 2 ? p[1] : "21") + "." + (p.length >= 3 ? p[2] : "0") + "."; yield Http.list(Http.getJson("https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge"), "versions").stream().anyMatch(v -> v.toString().startsWith(pfx)); }
+            case FABRIC -> !Http.getJsonArray(FABRIC_META + "/versions/loader/" + mc).isEmpty();
+            case QUILT -> !Http.getJsonArray(QUILT_META + "/versions/loader/" + mc).isEmpty();
+            case FORGE -> Http.obj(Http.getJson(FORGE_META + "/net/minecraftforge/forge/promotions_slim.json"), "promos").containsKey(mc + "-latest");
+            case NEOFORGE -> { String[] p = mc.split("\\."); String pfx = neoforgePrefix(p); yield Http.list(Http.getJson(NEOFORGE_META + "/api/maven/versions/releases/net/neoforged/neoforge"), "versions").stream().anyMatch(v -> v.toString().startsWith(pfx)); }
             case VANILLA -> true;
-        }; } catch (Exception e) { return false; }
+        }; } catch (Exception ignored) { return false; }
+    }
+
+    private static String neoforgePrefix(String[] parts) {
+        return (parts.length >= 2 ? parts[1] : "21") + "." + (parts.length >= 3 ? parts[2] : "0") + ".";
     }
 
     @SuppressWarnings("unchecked")
     public String getLatestSupported(boolean allowSnapshots) {
         try {
-            String url = switch (this) { case FABRIC -> "https://meta.fabricmc.net/v2/versions/game"; case QUILT -> "https://meta.quiltmc.org/v3/versions/game"; default -> null; };
+            String url = switch (this) { case FABRIC -> FABRIC_META + "/versions/game"; case QUILT -> QUILT_META + "/versions/game"; default -> null; };
             if (url != null) {
                 for (Object o : Http.getJsonArray(url)) {
                     var g = (Map<String, Object>) o;
@@ -85,15 +95,15 @@ public enum Loader {
                 }
                 return null;
             }
-            var latest = Http.obj(Http.getJson("https://launchermeta.mojang.com/mc/game/version_manifest_v2.json"), "latest");
+            var latest = Http.obj(Http.getJson(MOJANG_META + "/mc/game/version_manifest_v2.json"), "latest");
             return Http.str(latest, allowSnapshots ? "snapshot" : "release");
-        } catch (Exception e) { return null; }
+        } catch (Exception ignored) { return null; }
     }
 
     public boolean install(String mc, Path dir, Console c) {
         try { return switch (this) {
-            case FABRIC -> runInstaller(Http.getJsonArray("https://meta.fabricmc.net/v2/versions/installer"), dir, c, "java", "-jar", "installer.jar", "server", "-mcversion", mc, "-downloadMinecraft");
-            case QUILT -> runInstaller(Http.getJsonArray("https://meta.quiltmc.org/v3/versions/installer"), dir, c, "java", "-jar", "installer.jar", "install", "server", mc, "--download-server");
+            case FABRIC -> runInstaller(Http.getJsonArray(FABRIC_META + "/versions/installer"), dir, c, "java", "-jar", "installer.jar", "server", "-mcversion", mc, "-downloadMinecraft");
+            case QUILT -> runInstaller(Http.getJsonArray(QUILT_META + "/versions/installer"), dir, c, "java", "-jar", "installer.jar", "install", "server", mc, "--download-server");
             case FORGE -> installForge(mc, dir, c);
             case NEOFORGE -> installNeoForge(mc, dir, c);
             case VANILLA -> installVanilla(mc, dir, c);
@@ -113,28 +123,44 @@ public enum Loader {
     }
 
     private boolean installForge(String mc, Path dir, Console c) throws Exception {
-        var promos = Http.obj(Http.getJson("https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json"), "promos");
-        String fv = Http.str(promos, mc + "-recommended"); if (fv == null) fv = Http.str(promos, mc + "-latest");
+        var promos = Http.obj(Http.getJson(FORGE_META + "/net/minecraftforge/forge/promotions_slim.json"), "promos");
+        String fv = Http.str(promos, mc + "-recommended");
+        if (fv == null) fv = Http.str(promos, mc + "-latest");
         if (fv == null) { c.fail("No Forge for MC " + mc); return false; }
         String full = mc + "-" + fv;
-        return runInstaller(List.of(Map.of("url", "https://maven.minecraftforge.net/net/minecraftforge/forge/" + full + "/forge-" + full + "-installer.jar")), dir, c, "java", "-jar", "installer.jar", "--installServer");
+        String url = "https://maven.minecraftforge.net/net/minecraftforge/forge/" + full + "/forge-" + full + "-installer.jar";
+        return runInstaller(List.of(Map.of("url", url)), dir, c, "java", "-jar", "installer.jar", "--installServer");
     }
 
     private boolean installNeoForge(String mc, Path dir, Console c) throws Exception {
-        String[] p = mc.split("\\."); String pfx = (p.length >= 2 ? p[1] : "21") + "." + (p.length >= 3 ? p[2] : "0") + ".";
-        var vers = Http.list(Http.getJson("https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge"), "versions");
+        String[] p = mc.split("\\.");
+        String pfx = neoforgePrefix(p);
+        var vers = Http.list(Http.getJson(NEOFORGE_META + "/api/maven/versions/releases/net/neoforged/neoforge"), "versions");
         String nv = null, fallback = null;
-        for (var o : vers.reversed()) { String v = o.toString(); if (v.startsWith(pfx)) { if (!v.contains("-beta") && !v.contains("-alpha")) { nv = v; break; } if (fallback == null) fallback = v; } }
-        if (nv == null) nv = fallback; if (nv == null) { c.fail("No NeoForge for MC " + mc); return false; }
-        return runInstaller(List.of(Map.of("url", "https://maven.neoforged.net/releases/net/neoforged/neoforge/" + nv + "/neoforge-" + nv + "-installer.jar")), dir, c, "java", "-jar", "installer.jar", "--installServer");
+        for (var o : vers.reversed()) {
+            String v = o.toString();
+            if (v.startsWith(pfx)) {
+                if (!v.contains("-beta") && !v.contains("-alpha")) { nv = v; break; }
+                if (fallback == null) fallback = v;
+            }
+        }
+        if (nv == null) nv = fallback;
+        if (nv == null) { c.fail("No NeoForge for MC " + mc); return false; }
+        String url = NEOFORGE_META + "/releases/net/neoforged/neoforge/" + nv + "/neoforge-" + nv + "-installer.jar";
+        return runInstaller(List.of(Map.of("url", url)), dir, c, "java", "-jar", "installer.jar", "--installServer");
     }
 
     @SuppressWarnings("unchecked")
     private boolean installVanilla(String mc, Path dir, Console c) throws Exception {
-        var manifest = Http.getJson("https://launchermeta.mojang.com/mc/game/version_manifest_v2.json");
-        String vUrl = null; for (var v : Http.list(manifest, "versions")) { var m = (Map<String, Object>) v; if (mc.equals(Http.str(m, "id"))) { vUrl = Http.str(m, "url"); break; } }
+        var manifest = Http.getJson(MOJANG_META + "/mc/game/version_manifest_v2.json");
+        String vUrl = null;
+        for (var v : Http.list(manifest, "versions")) {
+            var m = (Map<String, Object>) v;
+            if (mc.equals(Http.str(m, "id"))) { vUrl = Http.str(m, "url"); break; }
+        }
         if (vUrl == null) { c.fail("Version " + mc + " not found"); return false; }
-        Http.download(Http.str(Http.obj(Http.obj(Http.getJson(vUrl), "downloads"), "server"), "url"), dir.resolve("server.jar"));
+        var downloads = Http.obj(Http.getJson(vUrl), "downloads");
+        Http.download(Http.str(Http.obj(downloads, "server"), "url"), dir.resolve("server.jar"));
         return true;
     }
 

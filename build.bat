@@ -7,6 +7,9 @@ echo.
 
 cd /d "%~dp0"
 
+:: Read version from VERSION file
+set /p VERSION=<VERSION
+
 :: Use Java 21 explicitly (Minecraft requires Java 21)
 set "JAVA_HOME="
 for /d %%G in ("C:\Program Files\Eclipse Adoptium\jdk-21*") do set "JAVA_HOME=%%G"
@@ -48,20 +51,19 @@ echo Packaging...
 (
 echo Manifest-Version: 1.0
 echo Main-Class: dev.woflo.fabric.Main
+echo Implementation-Version: %VERSION%
 ) > build\MANIFEST.MF
-cd build\optimized
-jar cfm "..\server maintainer by woflo.jar" ..\MANIFEST.MF .
-cd ..\..
+jar cfm "build\server maintainer by woflo %VERSION%.jar" build\MANIFEST.MF -C build\optimized .
 
 :: Recompress with advzip if available (zopfli = better deflate)
 where advzip >nul 2>&1 && (
     echo Recompressing with zopfli...
-    advzip -z -4 "build\server maintainer by woflo.jar"
+    advzip -z -4 "build\server maintainer by woflo %VERSION%.jar"
 )
 
 :: Show final size
 echo.
-for %%F in ("build\server maintainer by woflo.jar") do echo Final JAR: %%~zF bytes
+for %%F in ("build\server maintainer by woflo %VERSION%.jar") do echo Final JAR: %%~zF bytes
 echo.
-echo Done!
+echo Done! [v%VERSION%]
 pause

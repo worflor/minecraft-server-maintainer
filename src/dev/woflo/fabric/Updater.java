@@ -7,6 +7,8 @@ import java.util.concurrent.*;
 import java.util.function.*;
 
 public class Updater {
+    private static final String VERSION_PATTERN = "\\d+\\.\\d+(\\.\\d+)?";
+    private static final String[] STARTUP_SUCCESS_MARKERS = {"Done (", "For help, type"};
     private final Path dir;
     private final Config cfg;
     private final Console con;
@@ -93,7 +95,8 @@ public class Updater {
     }
 
     private int skip(int row) { con.rowSkip(row, "no folder"); return 0; }
-    private <T> T safe(Callable<T> c, T def) { try { return c.call(); } catch (Exception e) { return def; } }
+    private <T> T safe(Callable<T> c, T def) { try { return c.call(); } catch (Exception ignored) { return def; } }
+    private static boolean containsAny(String s, String[] markers) { for (String m : markers) if (s.contains(m)) return true; return false; }
 
     private int updateContent(int row, Path d, String type, Supplier<List<ModScanner.Mod>> scanner, Function<ModScanner.Mod, Api.CheckResult> checker) {
         var items = scanner.get();
@@ -106,7 +109,7 @@ public class Updater {
         if (dry) { con.rowDone(row, ups + " to update"); for (var r : toUp) con.detail(r.id(), r.oldVersion(), r.newVersion()); return ups; }
         if (!confirm("Update " + ups + " " + type + (ups > 1 ? "s" : "") + "?")) { con.rowDone(row, String.valueOf(cur + skip) + " (skipped " + ups + ")"); return 0; }
         var dls = runParallel(toUp, u -> Http.downloadVerified(u.downloadUrl(), d.resolve(u.fileName()), u.sha512(), 3) ? u : null, row);
-        int ok = 0; for (var r : dls) if (r != null) { try { if (!r.path().getFileName().toString().equals(r.fileName())) Files.deleteIfExists(r.path()); } catch (IOException e) {} ok++; }
+        int ok = 0; for (var r : dls) if (r != null) { try { if (!r.path().getFileName().toString().equals(r.fileName())) Files.deleteIfExists(r.path()); } catch (IOException ignored) {} ok++; }
         con.rowDone(row, ok + " updated");
         for (var r : dls) if (r != null) con.detail(r.id(), r.oldVersion(), r.newVersion());
         return ok;
@@ -144,7 +147,7 @@ public class Updater {
             try (var rd = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
                 long start = System.currentTimeMillis();
                 while (System.currentTimeMillis() - start < cfg.startupTimeout * 1000L) {
-                    if (rd.ready()) { String l = rd.readLine(); if (l != null && (l.contains("Done (") || l.contains("For help, type"))) { ok = true; break; } }
+                    if (rd.ready()) { String l = rd.readLine(); if (l != null && containsAny(l, STARTUP_SUCCESS_MARKERS)) { ok = true; break; } }
                     if (!p.isAlive()) break; Thread.sleep(100);
                 }
             }
@@ -168,13 +171,13 @@ public class Updater {
         finally { if (p != null) p.destroyForcibly(); }
     }
     private boolean checkDisk() { try { long mb = Files.getFileStore(dir).getUsableSpace() / (1024 * 1024); if (mb < 500) { con.fail("Need 500MB free (" + mb + "MB available)"); return false; } if (mb < 1000) con.warn("Low disk: " + mb + "MB"); return true; } catch (IOException e) { return true; } }
-    private void initDirs() { try { Files.createDirectories(dir.resolve("mods")); } catch (IOException e) {} }
+    private void initDirs() { try { Files.createDirectories(dir.resolve("mods")); } catch (IOException ignored) {} }
 
     private String detectVersion() {
         Path vf = dir.resolve("current_version.txt");
-        if (Files.exists(vf)) try { String v = Files.readString(vf).trim(); if (v.matches("\\d+\\.\\d+(\\.\\d+)?")) return v; } catch (IOException e) {}
+        if (Files.exists(vf)) try { String v = Files.readString(vf).trim(); if (v.matches(VERSION_PATTERN)) return v; } catch (IOException ignored) {}
         Path vd = dir.resolve("versions");
-        if (Files.exists(vd)) try (var s = Files.list(vd)) { var f = s.filter(Files::isDirectory).map(p -> p.getFileName().toString()).filter(n -> n.matches("\\d+\\.\\d+(\\.\\d+)?")).max(Comparator.naturalOrder()); if (f.isPresent()) { writeVersion(f.get()); return f.get(); } } catch (IOException e) {}
+        if (Files.exists(vd)) try (var s = Files.list(vd)) { var f = s.filter(Files::isDirectory).map(p -> p.getFileName().toString()).filter(n -> n.matches(VERSION_PATTERN)).max(Comparator.naturalOrder()); if (f.isPresent()) { writeVersion(f.get()); return f.get(); } } catch (IOException ignored) {}
         return null;
     }
 
@@ -187,11 +190,11 @@ public class Updater {
         Path d = dir.resolve("versions"); if (!Files.exists(d)) return;
         try (var s = Files.list(d)) {
             for (Path p : s.filter(Files::isDirectory).filter(x -> !x.getFileName().toString().equals(keep)).toList()) {
-                try { Backup.del(p); } catch (IOException e) {}
+                try { Backup.del(p); } catch (IOException ignored) {}
             }
-        } catch (IOException e) {}
+        } catch (IOException ignored) {}
     }
-    private String getWorldName() { Path p = dir.resolve("server.properties"); if (Files.exists(p)) try { for (String l : Files.readAllLines(p)) if (l.startsWith("level-name=")) return l.substring(11).trim(); } catch (IOException e) {} return "world"; }
+    private String getWorldName() { Path p = dir.resolve("server.properties"); if (Files.exists(p)) try { for (String l : Files.readAllLines(p)) if (l.startsWith("level-name=")) return l.substring(11).trim(); } catch (IOException ignored) {} return "world"; }
 
     private void checkIntegrity() {
         Path mods = dir.resolve("mods");
@@ -200,13 +203,13 @@ public class Updater {
             for (Path p : s.filter(f -> f.toString().endsWith(".jar")).toList()) {
                 if (Files.size(p) == 0) con.warn("Empty file: " + p.getFileName());
             }
-        } catch (IOException e) {}
+        } catch (IOException ignored) {}
     }
 
     // pending operation marker for crash recovery
     private Path pendingFile() { return dir.resolve("woflo").resolve(".pending"); }
-    private void writePending() { try { Files.writeString(pendingFile(), "update"); } catch (IOException e) {} }
-    private void clearPending() { try { Files.deleteIfExists(pendingFile()); } catch (IOException e) {} }
+    private void writePending() { try { Files.writeString(pendingFile(), "update"); } catch (IOException ignored) {} }
+    private void clearPending() { try { Files.deleteIfExists(pendingFile()); } catch (IOException ignored) {} }
     private boolean checkPending() {
         Path p = pendingFile();
         if (!Files.exists(p)) return false;
@@ -216,7 +219,7 @@ public class Updater {
             try (var s = Files.list(backups)) {
                 var latest = s.filter(Files::isDirectory).max(Comparator.comparing(x -> x.getFileName().toString()));
                 if (latest.isPresent() && Backup.restore(latest.get(), dir, loader, con)) { clearPending(); return false; }
-            } catch (IOException e) {}
+            } catch (IOException ignored) {}
         }
         con.fail("Cannot recover - manual intervention required");
         return true;

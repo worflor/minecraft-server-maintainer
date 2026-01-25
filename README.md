@@ -52,6 +52,7 @@ That's it. Config is created at `woflo/config.yml` on first run.
 - **Backups** - Created before Minecraft updates, auto-cleaned after 7 days
 - **Verification** - Tests startup after updates, rolls back if needed
 - **Crash recovery** - Restarts on crash with rate limiting
+- **Stasis snapshots** - Optional full server backups on clean stops
 - **Dry run** - Preview changes with `-d` flag
 
 ## Command Line
@@ -94,6 +95,12 @@ restart-delay: 5
 max-crashes: 3
 crash-window: 300
 
+# Full server snapshots (on clean stop)
+stasis:
+  enabled: false
+  interval: 24
+  keep: 3
+
 # Optional
 # target-version: 1.21.0
 # server-jar: server.jar
@@ -116,7 +123,9 @@ lithium-0.12.1.jar
 
 ## Backups
 
-Backups are stored in `woflo/backups/` with timestamps like `20250125-143022_mc`. Auto-cleaned after 7 days. Run with `--rollback` to restore the latest.
+**Incremental backups** are stored in `woflo/backups/` before Minecraft updates. Auto-cleaned after 7 days. Run with `--rollback` to restore the latest.
+
+**Stasis snapshots** (optional) create full compressed server archives in `woflo/stasis/` when the server stops cleanly. Enable in config with `stasis.enabled: true`. Great for preserving complete server state between sessions.
 
 ## How It Works
 

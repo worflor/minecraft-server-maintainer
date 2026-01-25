@@ -11,7 +11,8 @@ import java.util.*;
 
 public class Http {
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
-    private static final String USER_AGENT = "woflo/ServerMaintainer/1.0 (github.com/worflor/minecraft-server-maintainer)";
+    private static final String VERSION = Http.class.getPackage().getImplementationVersion() != null ? Http.class.getPackage().getImplementationVersion() : "dev";
+    private static final String USER_AGENT = "woflo/ServerMaintainer/" + VERSION + " (github.com/woflo/minecraft-server-maintainer)";
     private static final HttpClient client = HttpClient.newBuilder()
         .connectTimeout(TIMEOUT).followRedirects(HttpClient.Redirect.NORMAL).build();
 
@@ -24,7 +25,7 @@ public class Http {
             Thread.sleep(Math.min(parseRetryAfter(res), 60) * 1000L);
             return get(url, retries - 1);
         }
-        if (res.statusCode() != 200) throw new IOException("HTTP " + res.statusCode());
+        if (res.statusCode() < 200 || res.statusCode() >= 300) throw new IOException("HTTP " + res.statusCode());
         return res.body();
     }
 
@@ -42,7 +43,7 @@ public class Http {
             download(url, dest, retries - 1);
             return;
         }
-        if (res.statusCode() != 200) { Files.deleteIfExists(tmp); throw new IOException("HTTP " + res.statusCode()); }
+        if (res.statusCode() < 200 || res.statusCode() >= 300) { Files.deleteIfExists(tmp); throw new IOException("HTTP " + res.statusCode()); }
         try { Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
         catch (AtomicMoveNotSupportedException e) { Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING); }
     }

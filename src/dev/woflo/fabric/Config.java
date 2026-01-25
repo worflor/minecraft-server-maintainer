@@ -19,10 +19,14 @@ public class Config {
     public int restartDelay = 5, maxCrashes = 3, crashWindow = 300;
     public String targetVersion = null, serverJar = null;
     public static final int BACKUP_KEEP_DAYS = 7;
+    public boolean stasisEnabled = false;
+    public int stasisInterval = 24, stasisKeep = 3;
+
+    private static String version() { String v = Config.class.getPackage().getImplementationVersion(); return v != null ? v : "dev"; }
 
     private static final String DEFAULT = """
             # Server Maintainer by woflo :]
-            # [ v 1.0.0 ]
+            # [ v %s ]
             # Edit anytime. Changes apply on next restart.
 
             # How much memory should be allocated to the server
@@ -36,7 +40,7 @@ public class Config {
               mods: true             # Mods will update from Modrinth
               plugins: true          # Plugins will update from Modrinth (if plugins/ exists)
               datapacks: false       # Datapacks, from Modrinth (if world/datapacks/ exists)
-              min-compatibility: 90  # Only update MC if this % of content support it
+              min-compatibility: 90  # Only update MC if this %% of content support it
               allow-snapshots: false # Include Minecraft snapshots/pre-releases
               allow-beta: false      # Include beta versions (mods/plugins/datapacks)
 
@@ -57,6 +61,12 @@ public class Config {
             # Override the server JAR filename (auto-detected if not set):
             # server-jar: server.jar
 
+            # Full server snapshots (created when server stops, before restart)
+            stasis:
+              enabled: false
+              interval: 24    # hours between snapshots
+              keep: 3         # number of snapshots to retain
+
             # Skip specific items by adding # before their filename in mods.txt, plugins.txt, or datapacks.txt
             """;
 
@@ -66,7 +76,7 @@ public class Config {
         var f = wofloDir.resolve("config.yml");
         var c = new Config();
         if (!Files.exists(f)) {
-            Files.writeString(f, DEFAULT);
+            Files.writeString(f, DEFAULT.formatted(version()));
             return c;
         }
         c.parse(Files.readString(f));
@@ -129,6 +139,13 @@ public class Config {
                         case "min-compatibility" -> minCompatibility = num(val, 90);
                         case "allow-snapshots" -> allowSnapshots = bool(val);
                         case "allow-beta" -> allowBeta = bool(val);
+                    }
+                }
+                case "stasis" -> {
+                    switch (key) {
+                        case "enabled" -> stasisEnabled = bool(val);
+                        case "interval" -> stasisInterval = num(val, 24);
+                        case "keep" -> stasisKeep = num(val, 3);
                     }
                 }
                 case "" -> {

@@ -60,6 +60,6 @@ public class ModScanner {
             StringBuilder sb = new StringBuilder(cfg.header);
             items.stream().sorted(Comparator.comparing(Mod::fileName)).forEach(m -> sb.append(skipped.contains(m.fileName().toLowerCase()) ? "# " : "").append(m.fileName()).append("\n"));
             Files.writeString(dir.resolve(cfg.txt), sb.toString());
-        } catch (IOException e) {}
+        } catch (IOException ignored) {}
     }
 }

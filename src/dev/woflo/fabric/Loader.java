@@ -18,7 +18,6 @@ public enum Loader {
     private static final String V = "current_version.txt";
 
     public static Loader detect(Path dir) {
-        // Check for mod loaders first (takes priority over plugin servers)
         if (Files.exists(dir.resolve("fabric-server-launch.jar")) || Files.exists(dir.resolve(".fabric"))) return FABRIC;
         if (Files.exists(dir.resolve("quilt-server-launch.jar")) || Files.exists(dir.resolve(".quilt"))) return QUILT;
 
@@ -37,7 +36,6 @@ public enum Loader {
             if (s.anyMatch(p -> p.getFileName().toString().toLowerCase().contains("forge") && p.toString().endsWith(".jar"))) return FORGE;
         } catch (IOException ignored) {}
 
-        // Check root JARs for Paper/Purpur/Folia by examining contents (not just filenames)
         try (var s = Files.list(dir)) {
             for (Path p : s.filter(f -> f.toString().endsWith(".jar")).toList()) {
                 Loader l = detectServerJar(p);
@@ -45,7 +43,6 @@ public enum Loader {
             }
         } catch (IOException ignored) {}
 
-        // Check for plugins folder (likely Paper/Spigot derivative without identifiable JAR)
         if (Files.exists(dir.resolve("plugins")) && !Files.exists(mods)) return PAPER;
 
         if (Files.exists(dir.resolve("server.jar")) && (!Files.exists(mods) || isEmpty(mods))) return VANILLA;
@@ -54,12 +51,10 @@ public enum Loader {
 
     private static Loader detectServerJar(Path jar) {
         try (var z = new ZipFile(jar.toFile())) {
-            // Check manifest for paperclip (Paper/Purpur/Folia all use this)
             var manifest = z.getEntry("META-INF/MANIFEST.MF");
             if (manifest != null) {
                 String mf = new String(z.getInputStream(manifest).readAllBytes());
                 if (mf.contains("io.papermc.paperclip.Main")) {
-                    // It's a Paper-family JAR - check filename for specific variant
                     String name = jar.getFileName().toString().toLowerCase();
                     if (name.contains("folia")) return FOLIA;
                     if (name.contains("purpur")) return PURPUR;
@@ -102,7 +97,6 @@ public enum Loader {
         String expected = serverJar();
         if (Files.exists(dir.resolve(expected))) return expected;
 
-        // For plugin servers, find JAR by contents (more reliable than filename)
         if (usesPlugins()) {
             try (var s = Files.list(dir)) {
                 for (Path p : s.filter(f -> f.toString().endsWith(".jar")).toList()) {
@@ -272,12 +266,10 @@ public enum Loader {
         return runInstaller(List.of(Map.of("url", url)), dir, c, "java", "-jar", "installer.jar", "--installServer");
     }
 
-    @SuppressWarnings("unchecked")
     private boolean installPaper(String project, String mc, Path dir, Console c) throws Exception {
         var data = Http.getJson(PAPER_API + "/" + project + "/versions/" + mc + "/builds");
         var builds = Http.arr(data, "builds");
         if (builds.isEmpty()) { c.fail("No " + project + " builds for MC " + mc); return false; }
-        // Get latest build
         var latest = builds.getLast();
         int build = ((Number) latest.get("build")).intValue();
         var downloads = Http.obj(latest, "downloads");

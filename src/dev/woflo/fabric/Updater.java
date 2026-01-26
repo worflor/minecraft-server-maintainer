@@ -151,7 +151,6 @@ public class Updater {
             p = pb.directory(dir.toFile()).redirectErrorStream(true).start();
             var is = p.getInputStream();
             var found = new java.util.concurrent.atomic.AtomicBoolean(false);
-            // StreamGobbler pattern: consume output in background thread
             Thread.startVirtualThread(() -> {
                 try (var rd = new BufferedReader(new InputStreamReader(is))) {
                     String line; while ((line = rd.readLine()) != null) if (containsAny(line, STARTUP_SUCCESS_MARKERS)) found.set(true);

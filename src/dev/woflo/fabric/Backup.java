@@ -101,12 +101,12 @@ public class Backup {
                             Files.copy(p, zos);
                             zos.closeEntry();
                             size[0] += Files.size(p);
-                            console.checking("Stasis... " + formatSize(size[0]));
+                            console.progress("Stasis " + formatSize(size[0]));
                         } catch (IOException ignored) {}
                     });
                 }
             }
-            console.checkDone(formatSize(Files.size(dest)), true);
+            console.progressDone("Stasis", formatSize(Files.size(dest)));
         } catch (IOException e) { console.fail("Stasis failed: " + e.getMessage()); }
     }
 

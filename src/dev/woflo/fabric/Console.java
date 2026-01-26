@@ -50,7 +50,6 @@ public class Console {
 
     public void dryRun() { System.out.println("  " + a("(dry run)") + "\n"); }
 
-    // Initialize rows and save cursor position
     public void setupRows(String... lbl) {
         labels = new ArrayList<>(Arrays.asList(lbl));
         rowStatus = new String[lbl.length];
@@ -61,7 +60,6 @@ public class Console {
         redrawRows();
     }
 
-    // Redraw all rows from saved position
     private void redrawRows() {
         if (tty) System.out.print(RESTORE); // restore to start of row area
         for (int i = 0; i < labels.size(); i++) {
@@ -106,7 +104,6 @@ public class Console {
         redrawRows();
     }
 
-    // Show a status message in a row (e.g., "backing up", "installing")
     public void rowStatus(int i, String status) {
         if (i >= labels.size()) return;
         rowStatus[i] = y(BLK);
@@ -114,7 +111,6 @@ public class Console {
         redrawRows();
     }
 
-    // End row mode - cursor is now after rows, safe to print other content
     public void endRows() { }
 
     public void detail(String name, String from, String to) {
@@ -129,6 +125,17 @@ public class Console {
     public void checking(String what) { System.out.print("  " + a(what + "...")); System.out.flush(); }
     public void checkDone(String result, boolean ok) { System.out.println(" " + (ok ? w(result) + " " + g(CHK) : y(result))); }
 
+    public void progress(String msg) {
+        hideCursor();
+        System.out.print("\r" + CL + "  " + a(msg + "..."));
+        System.out.flush();
+    }
+    public void progressDone(String label, String result) {
+        System.out.println("\r" + CL + "  " + w(label) + " " + g(result) + " " + g(CHK));
+        showCursor();
+        log("OK", label + " " + result);
+    }
+
     public void countdown() {
         hideCursor();
         for (int i = COUNTDOWN_FRAMES; i >= 0; i--) {
@@ -138,6 +145,20 @@ public class Console {
             sleep(50);
         }
         System.out.print("\r" + " ".repeat(COUNTDOWN_WIDTH + 4) + "\r"); showCursor();
+    }
+
+    public void countdownSeconds(int seconds) {
+        hideCursor();
+        int totalFrames = seconds * 20; // 20 fps for smooth animation
+        for (int i = totalFrames; i >= 0; i--) {
+            double t = i / (double) totalFrames;
+            int w = (int)(t * t * COUNTDOWN_WIDTH);
+            System.out.print((i == totalFrames ? "\n  " : "\r  ") + p(BLK.repeat(w)) + " ".repeat(COUNTDOWN_WIDTH - w));
+            System.out.flush();
+            sleep(50);
+        }
+        System.out.print("\r" + " ".repeat(COUNTDOWN_WIDTH + 4) + "\r");
+        showCursor();
     }
 
     public void hideCursor() { if (tty) System.out.print("\u001B[?25l"); }

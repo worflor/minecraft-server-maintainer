@@ -78,7 +78,6 @@ public class Config {
             # Skip specific items by adding # before their filename in mods.txt, plugins.txt, or datapacks.txt
             """;
 
-    // Load config, auto-upgrading format while preserving user values
     public static Config load(Path dir) throws IOException {
         var f = dir.resolve("woflo").resolve("config.yml");
         Files.createDirectories(f.getParent());
@@ -90,7 +89,6 @@ public class Config {
         return c;
     }
 
-    // Generate config from template with current values injected
     private String generate() {
         var sb = new StringBuilder(DEFAULT.formatted(version()));
         replace(sb, "min: 2G", "min: " + memoryMin);

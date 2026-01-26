@@ -77,21 +77,19 @@ public class Main {
                 long run = System.currentTimeMillis() - start;
                 if (exit == 0 || run > windowMs) {
                     crashes = new long[maxCrashes];
-                    System.out.println("\nServer stopped.");
+                    console.blankLine();
+                    console.info("Server stopped.");
                     if (config.stasisEnabled && Backup.stasisDue(serverDir, config.stasisInterval)) {
                         Backup.createStasis(serverDir, console);
                         Backup.cleanupStasis(serverDir, config.stasisKeep);
-                        System.out.println("Restarting...\n");
-                    } else {
-                        System.out.println("Restarting in " + config.restartDelay + " seconds...\n");
-                        Thread.sleep(delayMs);
                     }
+                    console.countdownSeconds(config.restartDelay);
                     continue;
                 }
                 crashes[ci] = System.currentTimeMillis(); ci = (ci + 1) % maxCrashes;
                 int recent = 0; long now = System.currentTimeMillis(); for (long t : crashes) if (t > 0 && now - t < windowMs) recent++;
                 if (recent >= maxCrashes) { console.fail("Server crashed " + maxCrashes + " times in " + (config.crashWindow / 60) + " minutes"); console.warn("Check logs. Waiting " + (config.crashWindow / 60) + " minutes..."); crashes = new long[maxCrashes]; Thread.sleep(windowMs); }
-                else { System.out.println("\nServer crashed (exit " + exit + "). Restarting in " + config.restartDelay + " seconds...\n"); Thread.sleep(delayMs); }
+                else { console.blankLine(); console.warn("Server crashed (exit " + exit + ")"); console.countdownSeconds(config.restartDelay); }
             } catch (InterruptedException e) { if (serverProc != null) serverProc.destroyForcibly(); break; } catch (Exception e) { System.err.println("Failed to start: " + e.getMessage()); try { Thread.sleep(delayMs); } catch (InterruptedException e2) {} }
         }
     }

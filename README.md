@@ -39,18 +39,31 @@
 - Rolls back automatically if something breaks
 - Restarts on crash with rate limiting
 
+## Why...
+
+**not Docker?**
+I don't want to learn Docker just to run a Minecraft server. I want to double-click something and have it work. :P
+
+**not Pterodactyl/AMP/Crafty?**
+I'm running one, two, or three servers for my friends, not a hosting company. I don't need a web panel, just the trust that its up, and will be up again if someone crashes it.
+
+**not AutoPlug?**
+AutoPlug's great and has WAY more features. It's also WAY bigger, has a paid tier, and overall isn't one 50kb jar with one config. Running the same language as the game itself.
+
+I've been running Minecraft servers for years with `run.bat` scripts of various complexities. This tool is the natural evolution of that.
+
 ## Quick Start
 
-**Requirements:** Java 21+ and an existing Minecraft server
+**Requirements:** Java 21+
 
 1. Drop `server maintainer by woflo.jar` in your server folder
 2. Double-click it
 
-That's it. Config is created at `woflo/config.yml` on first run.
+*That's it.* Config is created at `woflo/config.yml` on first run. If no server is found, it will download a fresh fabric server.
 
 ## Features
 
-- **Auto-updates** - Minecraft, mod loaders, mods, plugins, datapacks
+- **Auto-updates** - Minecraft, mod loaders (fabric, neoforge...), mods, plugins, datapacks
 - **Smart updates** - Only updates Minecraft when enough mods support it
 - **Backups** - Created before Minecraft updates, auto-cleaned after 7 days
 - **Verification** - Tests startup after updates, rolls back if needed
@@ -98,7 +111,7 @@ restart-delay: 5
 max-crashes: 3
 crash-window: 300
 
-# Full server snapshots (on clean stop)
+# Full server snapshots [on clean stop]
 stasis:
   enabled: false
   interval: 24
@@ -106,7 +119,7 @@ stasis:
 
 # Optional
 # target-version: 1.21.0
-# server-jar: server.jar
+# server-jar: server_jar_name.jar
 ```
 
 ## Skipping Updates
@@ -136,15 +149,21 @@ lithium-0.12.1.jar
   <img src="assets/demo.gif" alt="Server Maintainer in action" width="600">
 </p>
 
-**Detect** - Find mod loader and current versions
-**Check** - Query Mojang API and Modrinth for updates
-**Backup** - Save current state before Minecraft updates
-**Update** - Download and install new versions
-**Verify** - Test server startup, rollback if needed
-**Run** - Start server with crash recovery
+- **Detect** - Find server type and current versions
+- **Check** - Query Mojang API and Modrinth for updates
+- **Backup** - Save current state before updates
+- **Update** - Download and install new content
+- **Verify** - Test server startup, rollback if needed
+- **Run** - Start server with crash recovery
+
+## How I Use It
+
+I have a scheduled startup task on my Server PC that runs every script in a folder. In that folder, I put shortcuts to `run.bat` files for my servers. (now to 'run.jar' with this tool)
+
+That's it. Servers start on boot, restart on crash, and self-maintain over time. I can `/stop` from in-game and it'll be back in 5 seconds. No web UI, no Docker, no panel - it's just a jar.
 
 ---
 
 <p align="center">
-  <a href="LICENSE">GPL-3.0</a>
+  <a href="docs/FAQ.md">FAQ</a> · <a href="LICENSE">GPL-3.0</a>
 </p>

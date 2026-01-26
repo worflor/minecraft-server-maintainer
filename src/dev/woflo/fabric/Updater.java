@@ -92,7 +92,7 @@ public class Updater {
                     if (backup == null && !dry) { con.endRows(); con.fail("Backup failed"); clearPending(); con.showCursor(); return 1; }
                     con.rowStatus(row, "installing");
                     if (!dry && !loader.install(latest, dir, con)) { con.endRows(); Backup.restore(backup, dir, loader, con); clearPending(); con.showCursor(); return 1; }
-                    if (!dry) { writeVersion(latest); cleanOld(latest); }
+                    if (!dry) { writeVersion(latest); cleanOld(latest); logUpdate(loader.displayName(), current, latest); }
                     con.rowDoneUpdate(row++, current, latest); target = latest; mcUp = true;
                 }
             }
@@ -127,7 +127,7 @@ public class Updater {
         var dls = runParallel(toUp, u -> Http.downloadVerified(u.downloadUrl(), d.resolve(u.fileName()), u.sha512(), 3) ? u : null, row);
         int ok = 0; for (var r : dls) if (r != null) { try { if (!r.path().getFileName().toString().equals(r.fileName())) Files.deleteIfExists(r.path()); } catch (IOException ignored) {} ok++; }
         con.rowDone(row, ok + " updated");
-        for (var r : dls) if (r != null) con.detail(r.id(), r.oldVersion(), r.newVersion());
+        for (var r : dls) if (r != null) { logUpdate(r.id(), r.oldVersion(), r.newVersion()); con.detail(r.id(), r.oldVersion(), r.newVersion()); }
         return ok;
     }
 
@@ -223,6 +223,28 @@ public class Updater {
         try { Files.writeString(tmp, v); Files.move(tmp, vf, StandardCopyOption.REPLACE_EXISTING); }
         catch (IOException e) { try { Files.deleteIfExists(tmp); } catch (IOException e2) {} con.warn("Failed to save version"); }
     }
+    private void logUpdate(String name, String oldVer, String newVer) {
+        try {
+            Path log = dir.resolve("woflo").resolve("update.txt");
+            String ts = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("MMM dd, HH:mm"));
+            String old = oldVer != null ? oldVer : "?";
+            String entry = "  " + name + "  " + old + " → " + newVer + "  (" + ts + ")";
+
+            List<String> lines = new ArrayList<>();
+            lines.add("─── recent updates ───");
+            lines.add("");
+            lines.add(entry);
+            if (Files.exists(log)) {
+                var existing = Files.readAllLines(log).stream()
+                    .filter(l -> !l.isBlank() && !l.startsWith("───"))
+                    .limit(6).toList();
+                lines.addAll(existing);
+            }
+            lines.add("");
+            Files.writeString(log, String.join("\n", lines) + "\n");
+        } catch (IOException ignored) {}
+    }
+
     private void cleanOld(String keep) {
         Path d = dir.resolve("versions"); if (!Files.exists(d)) return;
         try (var s = Files.list(d)) {

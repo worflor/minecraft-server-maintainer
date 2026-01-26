@@ -34,6 +34,14 @@ public class Config {
               min: 2G
               max: 6G
 
+            # Custom JVM arguments (these are the defaults, modify as needed)
+            jvm-args:
+              - -Djava.awt.headless=true
+              - -XX:+UseG1GC
+              - -XX:+ParallelRefProcEnabled
+              - -XX:+DisableExplicitGC
+              - -XX:+AlwaysPreTouch
+
             # These update automatically, set to false to prevent that
             updates:
               minecraft: true        # Minecraft + ModLoader update when new stable versions are released
@@ -70,17 +78,61 @@ public class Config {
             # Skip specific items by adding # before their filename in mods.txt, plugins.txt, or datapacks.txt
             """;
 
+    // Load config, auto-upgrading format while preserving user values
     public static Config load(Path dir) throws IOException {
-        var wofloDir = dir.resolve("woflo");
-        Files.createDirectories(wofloDir);
-        var f = wofloDir.resolve("config.yml");
+        var f = dir.resolve("woflo").resolve("config.yml");
+        Files.createDirectories(f.getParent());
         var c = new Config();
-        if (!Files.exists(f)) {
-            Files.writeString(f, DEFAULT.formatted(version()));
-            return c;
-        }
-        c.parse(Files.readString(f));
+        String existing = Files.exists(f) ? Files.readString(f) : "";
+        if (!existing.isEmpty()) c.parse(existing);
+        String fresh = c.generate();
+        if (!fresh.equals(existing)) Files.writeString(f, fresh);
         return c;
+    }
+
+    // Generate config from template with current values injected
+    private String generate() {
+        var sb = new StringBuilder(DEFAULT.formatted(version()));
+        replace(sb, "min: 2G", "min: " + memoryMin);
+        replace(sb, "max: 6G", "max: " + memoryMax);
+        // Replace jvm-args list with current values
+        String defaultJvmArgs = """
+              - -Djava.awt.headless=true
+              - -XX:+UseG1GC
+              - -XX:+ParallelRefProcEnabled
+              - -XX:+DisableExplicitGC
+              - -XX:+AlwaysPreTouch""";
+        var jvmSb = new StringBuilder();
+        for (int i = 0; i < jvmArgs.size(); i++) {
+            if (i > 0) jvmSb.append("\n");
+            jvmSb.append("  - ").append(jvmArgs.get(i));
+        }
+        replace(sb, defaultJvmArgs, jvmSb.toString());
+        replace(sb, "minecraft: true", "minecraft: " + updateMinecraft);
+        replace(sb, "mods: true", "mods: " + updateMods);
+        replace(sb, "plugins: true", "plugins: " + updatePlugins);
+        replace(sb, "datapacks: false", "datapacks: " + updateDatapacks);
+        replace(sb, "min-compatibility: 90", "min-compatibility: " + minCompatibility);
+        replace(sb, "allow-snapshots: false", "allow-snapshots: " + allowSnapshots);
+        replace(sb, "allow-beta: false", "allow-beta: " + allowBeta);
+        replace(sb, "startup-timeout: 90", "startup-timeout: " + startupTimeout);
+        replace(sb, "interactive: false", "interactive: " + interactive);
+        replace(sb, "restart-delay: 5", "restart-delay: " + restartDelay);
+        replace(sb, "max-crashes: 3", "max-crashes: " + maxCrashes);
+        replace(sb, "crash-window: 300", "crash-window: " + crashWindow);
+        // Stasis section - use surrounding context to avoid ambiguity with other fields
+        replace(sb, "stasis:\n  enabled: false", "stasis:\n  enabled: " + stasisEnabled);
+        replace(sb, "interval: 24    #", "interval: " + stasisInterval + "    #");
+        replace(sb, "keep: 3         #", "keep: " + stasisKeep + "         #");
+        // Optional fields - uncomment if user specified
+        if (targetVersion != null) replace(sb, "# target-version: 1.21.0", "target-version: " + targetVersion);
+        if (serverJar != null) replace(sb, "# server-jar: server.jar", "server-jar: " + serverJar);
+        return sb.toString();
+    }
+
+    private static void replace(StringBuilder sb, String target, String replacement) {
+        int i = sb.indexOf(target);
+        if (i >= 0) sb.replace(i, i + target.length(), replacement);
     }
 
     private void parse(String content) {

@@ -6,16 +6,22 @@ import java.util.*;
 import java.util.zip.*;
 
 public enum Loader {
-    FABRIC, FORGE, NEOFORGE, QUILT, VANILLA;
+    FABRIC, FORGE, NEOFORGE, QUILT, PAPER, PURPUR, FOLIA, VANILLA;
 
     private static final String FABRIC_META = "https://meta.fabricmc.net/v2";
     private static final String QUILT_META = "https://meta.quiltmc.org/v3";
     private static final String FORGE_META = "https://files.minecraftforge.net";
     private static final String NEOFORGE_META = "https://maven.neoforged.net";
     private static final String MOJANG_META = "https://launchermeta.mojang.com";
+    private static final String PAPER_API = "https://api.papermc.io/v2/projects";
+    private static final String PURPUR_API = "https://api.purpurmc.org/v2/purpur";
+    private static final String V = "current_version.txt";
 
     public static Loader detect(Path dir) {
+        // Check for mod loaders first (takes priority over plugin servers)
         if (Files.exists(dir.resolve("fabric-server-launch.jar")) || Files.exists(dir.resolve(".fabric"))) return FABRIC;
+        if (Files.exists(dir.resolve("quilt-server-launch.jar")) || Files.exists(dir.resolve(".quilt"))) return QUILT;
+
         Path mods = dir.resolve("mods");
         if (Files.exists(mods)) {
             try (var s = Files.list(mods)) {
@@ -26,9 +32,42 @@ public enum Loader {
                 }
             } catch (IOException ignored) {}
         }
-        try (var s = Files.list(dir)) { if (s.anyMatch(p -> p.getFileName().toString().toLowerCase().contains("forge") && p.toString().endsWith(".jar"))) return FORGE; } catch (IOException ignored) {}
+
+        try (var s = Files.list(dir)) {
+            if (s.anyMatch(p -> p.getFileName().toString().toLowerCase().contains("forge") && p.toString().endsWith(".jar"))) return FORGE;
+        } catch (IOException ignored) {}
+
+        // Check root JARs for Paper/Purpur/Folia by examining contents (not just filenames)
+        try (var s = Files.list(dir)) {
+            for (Path p : s.filter(f -> f.toString().endsWith(".jar")).toList()) {
+                Loader l = detectServerJar(p);
+                if (l != null) return l;
+            }
+        } catch (IOException ignored) {}
+
+        // Check for plugins folder (likely Paper/Spigot derivative without identifiable JAR)
+        if (Files.exists(dir.resolve("plugins")) && !Files.exists(mods)) return PAPER;
+
         if (Files.exists(dir.resolve("server.jar")) && (!Files.exists(mods) || isEmpty(mods))) return VANILLA;
         return FABRIC;
+    }
+
+    private static Loader detectServerJar(Path jar) {
+        try (var z = new ZipFile(jar.toFile())) {
+            // Check manifest for paperclip (Paper/Purpur/Folia all use this)
+            var manifest = z.getEntry("META-INF/MANIFEST.MF");
+            if (manifest != null) {
+                String mf = new String(z.getInputStream(manifest).readAllBytes());
+                if (mf.contains("io.papermc.paperclip.Main")) {
+                    // It's a Paper-family JAR - check filename for specific variant
+                    String name = jar.getFileName().toString().toLowerCase();
+                    if (name.contains("folia")) return FOLIA;
+                    if (name.contains("purpur")) return PURPUR;
+                    return PAPER;
+                }
+            }
+        } catch (IOException ignored) {}
+        return null;
     }
 
     private static boolean isEmpty(Path d) { try (var s = Files.list(d)) { return s.findFirst().isEmpty(); } catch (IOException e) { return true; } }
@@ -43,32 +82,97 @@ public enum Loader {
         return null;
     }
 
-    public String serverJar() { return switch (this) { case FABRIC -> "fabric-server-launch.jar"; case QUILT -> "quilt-server-launch.jar"; case FORGE -> "forge-server.jar"; case NEOFORGE -> "neoforge-server.jar"; case VANILLA -> "server.jar"; }; }
+    public boolean usesPlugins() { return this == PAPER || this == PURPUR || this == FOLIA; }
+    public boolean usesMods() { return this == FABRIC || this == QUILT || this == FORGE || this == NEOFORGE; }
+
+    public String serverJar() {
+        return switch (this) {
+            case FABRIC -> "fabric-server-launch.jar";
+            case QUILT -> "quilt-server-launch.jar";
+            case FORGE -> "forge-server.jar";
+            case NEOFORGE -> "neoforge-server.jar";
+            case PAPER -> "paper.jar";
+            case PURPUR -> "purpur.jar";
+            case FOLIA -> "folia.jar";
+            case VANILLA -> "server.jar";
+        };
+    }
 
     public String findServerJar(Path dir) {
         String expected = serverJar();
         if (Files.exists(dir.resolve(expected))) return expected;
-        // fallback: search by name
-        String search = switch (this) { case FABRIC -> "fabric"; case QUILT -> "quilt"; case FORGE -> "forge"; case NEOFORGE -> "neoforge"; case VANILLA -> "server"; };
+
+        // For plugin servers, find JAR by contents (more reliable than filename)
+        if (usesPlugins()) {
+            try (var s = Files.list(dir)) {
+                for (Path p : s.filter(f -> f.toString().endsWith(".jar")).toList()) {
+                    if (detectServerJar(p) == this) return p.getFileName().toString();
+                }
+            } catch (IOException ignored) {}
+        }
+
+        String search = switch (this) {
+            case FABRIC -> "fabric"; case QUILT -> "quilt"; case FORGE -> "forge"; case NEOFORGE -> "neoforge";
+            case PAPER -> "paper"; case PURPUR -> "purpur"; case FOLIA -> "folia"; case VANILLA -> "server";
+        };
+
         try (var s = Files.list(dir)) {
             var jars = s.filter(p -> p.toString().endsWith(".jar"))
                 .map(p -> p.getFileName().toString())
                 .filter(n -> n.toLowerCase().contains(search))
-                .filter(n -> !n.contains("installer"))
+                .filter(n -> !n.toLowerCase().contains("installer"))
+                .filter(n -> !n.toLowerCase().contains("woflo") && !n.toLowerCase().contains("maintainer"))
                 .toList();
             if (jars.size() == 1) return jars.get(0);
-            if (jars.size() > 1) throw new RuntimeException("Too many server JARs! I'm getting confused. Set 'server-jar' in config.yml or remove the extras to help me out:\n  - " + String.join("\n  - ", jars));
+            if (jars.size() > 1) throw new RuntimeException("Multiple " + displayName() + " JARs: " + String.join(", ", jars) + " - set server-jar in config");
         } catch (IOException ignored) {}
+
         // Forge/NeoForge run scripts
         if ((this == FORGE || this == NEOFORGE) && (Files.exists(dir.resolve("run.bat")) || Files.exists(dir.resolve("run.sh")))) {
             return System.getProperty("os.name").toLowerCase().contains("win") ? "run.bat" : "run.sh";
         }
         return expected;
     }
-    public String displayName() { return switch (this) { case FABRIC -> "Fabric"; case FORGE -> "Forge"; case NEOFORGE -> "NeoForge"; case QUILT -> "Quilt"; case VANILLA -> "Vanilla"; }; }
-    public List<String> modrinthLoaders() { return switch (this) { case FABRIC -> List.of("fabric", "quilt"); case QUILT -> List.of("quilt", "fabric"); case NEOFORGE -> List.of("neoforge", "forge"); case FORGE -> List.of("forge", "neoforge"); case VANILLA -> List.of(); }; }
-    public Set<String> ignoredModIds() { return switch (this) { case FABRIC -> Set.of("java", "minecraft", "fabricloader", "mixinextras", "fabric-api"); case QUILT -> Set.of("java", "minecraft", "quilt_loader", "quilted_fabric_api"); case FORGE -> Set.of("minecraft", "forge"); case NEOFORGE -> Set.of("minecraft", "neoforge"); case VANILLA -> Set.of(); }; }
-    public String[] backupItems() { return switch (this) { case FABRIC -> new String[]{"mods", "versions", "libraries", "fabric-server-launch.jar", "current_version.txt"}; case QUILT -> new String[]{"mods", "versions", "libraries", "quilt-server-launch.jar", "current_version.txt"}; case FORGE, NEOFORGE -> new String[]{"mods", "libraries", "run.jar", "current_version.txt"}; case VANILLA -> new String[]{"server.jar", "current_version.txt"}; }; }
+
+    public String displayName() {
+        return switch (this) {
+            case FABRIC -> "Fabric"; case FORGE -> "Forge"; case NEOFORGE -> "NeoForge"; case QUILT -> "Quilt";
+            case PAPER -> "Paper"; case PURPUR -> "Purpur"; case FOLIA -> "Folia"; case VANILLA -> "Vanilla";
+        };
+    }
+
+    public List<String> modrinthLoaders() {
+        return switch (this) {
+            case FABRIC -> List.of("fabric", "quilt");
+            case QUILT -> List.of("quilt", "fabric");
+            case NEOFORGE -> List.of("neoforge", "forge");
+            case FORGE -> List.of("forge", "neoforge");
+            case PAPER, PURPUR, FOLIA -> List.of("paper", "spigot", "bukkit");
+            case VANILLA -> List.of();
+        };
+    }
+
+    public Set<String> ignoredModIds() {
+        return switch (this) {
+            case FABRIC -> Set.of("java", "minecraft", "fabricloader", "mixinextras", "fabric-api");
+            case QUILT -> Set.of("java", "minecraft", "quilt_loader", "quilted_fabric_api");
+            case FORGE -> Set.of("minecraft", "forge");
+            case NEOFORGE -> Set.of("minecraft", "neoforge");
+            case PAPER, PURPUR, FOLIA, VANILLA -> Set.of();
+        };
+    }
+
+    public String[] backupItems() {
+        return switch (this) {
+            case FABRIC -> new String[]{"mods", "versions", "libraries", "fabric-server-launch.jar", V};
+            case QUILT -> new String[]{"mods", "versions", "libraries", "quilt-server-launch.jar", V};
+            case FORGE, NEOFORGE -> new String[]{"mods", "libraries", "run.bat", "run.sh", V};
+            case PAPER -> new String[]{"plugins", "paper.jar", V};
+            case PURPUR -> new String[]{"plugins", "purpur.jar", V};
+            case FOLIA -> new String[]{"plugins", "folia.jar", V};
+            case VANILLA -> new String[]{"server.jar", V};
+        };
+    }
 
     public boolean isReady(String mc) {
         try { return switch (this) {
@@ -76,6 +180,8 @@ public enum Loader {
             case QUILT -> !Http.getJsonArray(QUILT_META + "/versions/loader/" + mc).isEmpty();
             case FORGE -> Http.obj(Http.getJson(FORGE_META + "/net/minecraftforge/forge/promotions_slim.json"), "promos").containsKey(mc + "-latest");
             case NEOFORGE -> { String[] p = mc.split("\\."); String pfx = neoforgePrefix(p); yield Http.list(Http.getJson(NEOFORGE_META + "/api/maven/versions/releases/net/neoforged/neoforge"), "versions").stream().anyMatch(v -> v.toString().startsWith(pfx)); }
+            case PAPER, FOLIA -> !Http.arr(Http.getJson(PAPER_API + "/" + name().toLowerCase() + "/versions/" + mc + "/builds"), "builds").isEmpty();
+            case PURPUR -> { Http.getJson(PURPUR_API + "/" + mc); yield true; }
             case VANILLA -> true;
         }; } catch (Exception ignored) { return false; }
     }
@@ -87,13 +193,25 @@ public enum Loader {
     @SuppressWarnings("unchecked")
     public String getLatestSupported(boolean allowSnapshots) {
         try {
-            String url = switch (this) { case FABRIC -> FABRIC_META + "/versions/game"; case QUILT -> QUILT_META + "/versions/game"; default -> null; };
+            String url = switch (this) {
+                case FABRIC -> FABRIC_META + "/versions/game";
+                case QUILT -> QUILT_META + "/versions/game";
+                case PAPER, FOLIA -> PAPER_API + "/" + name().toLowerCase();
+                case PURPUR -> PURPUR_API;
+                default -> null;
+            };
             if (url != null) {
-                for (Object o : Http.getJsonArray(url)) {
-                    var g = (Map<String, Object>) o;
-                    if (allowSnapshots || Http.bool(g, "stable", false)) return Http.str(g, "version");
+                if (this == FABRIC || this == QUILT) {
+                    for (Object o : Http.getJsonArray(url)) {
+                        var g = (Map<String, Object>) o;
+                        if (allowSnapshots || Http.bool(g, "stable", false)) return Http.str(g, "version");
+                    }
+                    return null;
                 }
-                return null;
+                if (usesPlugins()) {
+                    var versions = Http.list(Http.getJson(url), "versions");
+                    return versions.isEmpty() ? null : versions.getLast().toString();
+                }
             }
             var latest = Http.obj(Http.getJson(MOJANG_META + "/mc/game/version_manifest_v2.json"), "latest");
             return Http.str(latest, allowSnapshots ? "snapshot" : "release");
@@ -103,9 +221,11 @@ public enum Loader {
     public boolean install(String mc, Path dir, Console c) {
         try { return switch (this) {
             case FABRIC -> runInstaller(Http.getJsonArray(FABRIC_META + "/versions/installer"), dir, c, "java", "-jar", "installer.jar", "server", "-mcversion", mc, "-downloadMinecraft");
-            case QUILT -> runInstaller(Http.getJsonArray(QUILT_META + "/versions/installer"), dir, c, "java", "-jar", "installer.jar", "install", "server", mc, "--download-server");
+            case QUILT -> runInstaller(Http.getJsonArray(QUILT_META + "/versions/installer"), dir, c, "java", "-jar", "installer.jar", "install", "server", mc, "--install-dir=.", "--download-server");
             case FORGE -> installForge(mc, dir, c);
             case NEOFORGE -> installNeoForge(mc, dir, c);
+            case PAPER, FOLIA -> installPaper(name().toLowerCase(), mc, dir, c);
+            case PURPUR -> installPurpur(mc, dir, c);
             case VANILLA -> installVanilla(mc, dir, c);
         }; } catch (Exception e) { c.fail("Install failed: " + e.getMessage()); return false; }
     }
@@ -117,7 +237,9 @@ public enum Loader {
         Path installer = dir.resolve("installer.jar");
         Http.download(url, installer);
         String[] full = Arrays.stream(cmd).map(s -> s.equals("installer.jar") ? installer.toString() : s).toArray(String[]::new);
-        int exit = new ProcessBuilder(full).directory(dir.toFile()).inheritIO().start().waitFor();
+        var p = new ProcessBuilder(full).directory(dir.toFile()).redirectErrorStream(true).start();
+        try (var is = p.getInputStream()) { is.transferTo(java.io.OutputStream.nullOutputStream()); }
+        int exit = p.waitFor();
         Files.deleteIfExists(installer);
         return exit == 0;
     }
@@ -151,6 +273,28 @@ public enum Loader {
     }
 
     @SuppressWarnings("unchecked")
+    private boolean installPaper(String project, String mc, Path dir, Console c) throws Exception {
+        var data = Http.getJson(PAPER_API + "/" + project + "/versions/" + mc + "/builds");
+        var builds = Http.arr(data, "builds");
+        if (builds.isEmpty()) { c.fail("No " + project + " builds for MC " + mc); return false; }
+        // Get latest build
+        var latest = builds.getLast();
+        int build = ((Number) latest.get("build")).intValue();
+        var downloads = Http.obj(latest, "downloads");
+        var app = Http.obj(downloads, "application");
+        String filename = Http.str(app, "name");
+        String url = PAPER_API + "/" + project + "/versions/" + mc + "/builds/" + build + "/downloads/" + filename;
+        Http.download(url, dir.resolve(project + ".jar"));
+        return true;
+    }
+
+    private boolean installPurpur(String mc, Path dir, Console c) throws Exception {
+        String url = PURPUR_API + "/" + mc + "/latest/download";
+        Http.download(url, dir.resolve("purpur.jar"));
+        return true;
+    }
+
+    @SuppressWarnings("unchecked")
     private boolean installVanilla(String mc, Path dir, Console c) throws Exception {
         var manifest = Http.getJson(MOJANG_META + "/mc/game/version_manifest_v2.json");
         String vUrl = null;
@@ -165,12 +309,13 @@ public enum Loader {
     }
 
     public String readModId(Path jar) {
+        if (usesPlugins()) return null; // Plugins handled by ModScanner
         try (var z = new ZipFile(jar.toFile())) {
             return switch (this) {
                 case FABRIC -> readEntry(z, "fabric.mod.json", j -> Http.str(Http.parseObject(j), "id"));
                 case QUILT -> { String id = readEntry(z, "quilt.mod.json", j -> Http.str(Http.obj(Http.parseObject(j), "quilt_loader"), "id")); yield id != null ? id : readEntry(z, "fabric.mod.json", j -> Http.str(Http.parseObject(j), "id")); }
                 case FORGE, NEOFORGE -> readEntry(z, z.getEntry("META-INF/neoforge.mods.toml") != null ? "META-INF/neoforge.mods.toml" : "META-INF/mods.toml", this::parseTomlModId);
-                case VANILLA -> null;
+                default -> null;
             };
         } catch (Exception e) { return null; }
     }

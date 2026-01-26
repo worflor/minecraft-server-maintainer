@@ -49,12 +49,20 @@ public class Http {
     }
 
     public static boolean downloadVerified(String url, Path dest, String hash, int retries) {
+        Path tmp = dest.resolveSibling(dest.getFileName() + ".tmp");
         for (int i = 0; i < retries; i++) {
             try {
                 download(url, dest);
-                if (hash == null || hash.isEmpty() || sha512(dest).equalsIgnoreCase(hash)) return true;
-                Files.deleteIfExists(dest);
-            } catch (Exception e) { try { Files.deleteIfExists(dest); } catch (IOException e2) {} }
+                if (hash != null && !hash.isEmpty()) {
+                    if (sha512(dest).equalsIgnoreCase(hash)) return true;
+                    Files.deleteIfExists(dest); // hash mismatch, retry
+                } else {
+                    return true; // no hash provided, accept (API limitation)
+                }
+            } catch (Exception e) {
+                try { Files.deleteIfExists(dest); } catch (IOException ignored) {}
+                try { Files.deleteIfExists(tmp); } catch (IOException ignored) {}
+            }
         }
         return false;
     }
@@ -80,9 +88,9 @@ public class Http {
     private String src; private int pos;
     private Http(String src) { this.src = src; }
 
-    public static Object parse(String json) { return new Http(json).parseValue(); }
-    @SuppressWarnings("unchecked") public static Map<String, Object> parseObject(String json) { return (Map<String, Object>) parse(json); }
-    @SuppressWarnings("unchecked") public static List<Object> parseArray(String json) { return (List<Object>) parse(json); }
+    private static Object parse(String json) { return new Http(json).parseValue(); }
+    @SuppressWarnings("unchecked") static Map<String, Object> parseObject(String json) { return (Map<String, Object>) parse(json); }
+    @SuppressWarnings("unchecked") static List<Object> parseArray(String json) { return (List<Object>) parse(json); }
 
     private Object parseValue() {
         skip();

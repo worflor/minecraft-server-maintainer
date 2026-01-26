@@ -20,10 +20,10 @@ public class Main {
         if (serverDir == null) serverDir = Path.of(".").toAbsolutePath();
         if (serverDir.getFileName().toString().equals("woflo")) serverDir = serverDir.getParent(); // support running from woflo/ folder
 
-        try { var wofloDir = serverDir.resolve("woflo"); java.nio.file.Files.createDirectories(wofloDir); console = new Console(wofloDir.resolve("update.log").toFile()); }
+        try { var wofloDir = serverDir.resolve("woflo"); java.nio.file.Files.createDirectories(wofloDir); console = new Console(wofloDir.resolve("update.log").toFile()); ModScanner.init(wofloDir); }
         catch (IOException e) { System.err.println("Failed to initialize: " + e.getMessage()); System.exit(1); }
 
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> { console.showCursor(); console.close(); }));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> { if (serverProc != null) serverProc.destroyForcibly(); console.showCursor(); console.close(); }));
 
         try {
             config = Config.load(serverDir);
@@ -49,6 +49,8 @@ public class Main {
         } catch (IOException e) { console.fail("Rollback failed: " + e.getMessage()); System.exit(1); }
     }
 
+    private static Process serverProc;
+
     private static void runServer() {
         String jarName = config.serverJar != null ? config.serverJar : loader.findServerJar(serverDir);
         Path jar = serverDir.resolve(jarName);
@@ -63,18 +65,18 @@ public class Main {
             cmd.addAll(List.of("java", "-Xms" + config.memoryMin, "-Xmx" + config.memoryMax));
             cmd.addAll(config.jvmArgs); cmd.addAll(List.of("-jar", jar.toString(), "nogui"));
         }
-        long[] crashes = new long[config.maxCrashes]; int ci = 0;
-        long windowMs = config.crashWindow * 1000L, delayMs = config.restartDelay * 1000L;
-        Process proc = null;
+        int maxCrashes = Math.max(1, config.maxCrashes); // prevent div by zero
+        long[] crashes = new long[maxCrashes]; int ci = 0;
+        long windowMs = Math.max(1000, config.crashWindow * 1000L), delayMs = Math.max(0, config.restartDelay * 1000L);
         while (true) {
             try {
                 long start = System.currentTimeMillis();
-                proc = new ProcessBuilder(cmd).directory(serverDir.toFile()).inheritIO().start();
-                int exit = proc.waitFor();
-                proc = null;
+                serverProc = new ProcessBuilder(cmd).directory(serverDir.toFile()).inheritIO().start();
+                int exit = serverProc.waitFor();
+                serverProc = null;
                 long run = System.currentTimeMillis() - start;
                 if (exit == 0 || run > windowMs) {
-                    crashes = new long[config.maxCrashes];
+                    crashes = new long[maxCrashes];
                     System.out.println("\nServer stopped.");
                     if (config.stasisEnabled && Backup.stasisDue(serverDir, config.stasisInterval)) {
                         Backup.createStasis(serverDir, console);
@@ -86,11 +88,11 @@ public class Main {
                     }
                     continue;
                 }
-                crashes[ci] = System.currentTimeMillis(); ci = (ci + 1) % config.maxCrashes;
+                crashes[ci] = System.currentTimeMillis(); ci = (ci + 1) % maxCrashes;
                 int recent = 0; long now = System.currentTimeMillis(); for (long t : crashes) if (t > 0 && now - t < windowMs) recent++;
-                if (recent >= config.maxCrashes) { console.fail("Server crashed " + config.maxCrashes + " times in " + (config.crashWindow / 60) + " minutes"); console.warn("Check logs. Waiting " + (config.crashWindow / 60) + " minutes..."); crashes = new long[config.maxCrashes]; Thread.sleep(windowMs); }
+                if (recent >= maxCrashes) { console.fail("Server crashed " + maxCrashes + " times in " + (config.crashWindow / 60) + " minutes"); console.warn("Check logs. Waiting " + (config.crashWindow / 60) + " minutes..."); crashes = new long[maxCrashes]; Thread.sleep(windowMs); }
                 else { System.out.println("\nServer crashed (exit " + exit + "). Restarting in " + config.restartDelay + " seconds...\n"); Thread.sleep(delayMs); }
-            } catch (InterruptedException e) { if (proc != null) proc.destroyForcibly(); break; } catch (Exception e) { System.err.println("Failed to start: " + e.getMessage()); try { Thread.sleep(delayMs); } catch (InterruptedException e2) {} }
+            } catch (InterruptedException e) { if (serverProc != null) serverProc.destroyForcibly(); break; } catch (Exception e) { System.err.println("Failed to start: " + e.getMessage()); try { Thread.sleep(delayMs); } catch (InterruptedException e2) {} }
         }
     }
 
@@ -115,7 +117,7 @@ public class Main {
             String os = System.getProperty("os.name").toLowerCase();
             ProcessBuilder pb;
             if (os.contains("win")) pb = new ProcessBuilder("cmd", "/c", "start", "cmd", "/k", "java", "-jar", jar, "--no-relaunch");
-            else if (os.contains("mac")) pb = new ProcessBuilder("open", "-a", "Terminal", Path.of(jar).getParent().toString());
+            else if (os.contains("mac")) { new ProcessBuilder("osascript", "-e", "tell app \"Terminal\" to do script \"java -jar '" + jar + "' --no-relaunch\"").start(); return true; }
             else { for (String t : new String[]{"gnome-terminal", "konsole", "xfce4-terminal", "xterm"}) { try { if (new ProcessBuilder("which", t).start().waitFor() == 0) { pb = new ProcessBuilder(t, "-e", "java", "-jar", jar, "--no-relaunch"); pb.start(); return true; } } catch (Exception ignored) {} } return false; }
             pb.start(); return true;
         } catch (Exception ignored) { return false; }
@@ -136,7 +138,7 @@ public class Main {
               -y, --yes          Skip prompts (overrides config)
               -h, --help         Show this help
 
-            Files: woflo/config.yml (config), mods/mods.txt (skip mods)
+            Files: woflo/config.yml, woflo/mods.txt, woflo/plugins.txt
             """);
     }
 }

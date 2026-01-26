@@ -15,8 +15,7 @@ public class Backup {
     private static FileTime mtime(Path p) { try { return Files.getLastModifiedTime(p); } catch (IOException e) { return FileTime.fromMillis(0); } }
     private static Path stasisDir(Path serverDir) { return serverDir.resolve("woflo").resolve("stasis"); }
 
-    public static Path create(Path serverDir, Loader loader, String reason, Console console) {
-        console.checking("Backup");
+    public static Path createSilent(Path serverDir, Loader loader, String reason) {
         Path backupDir = serverDir.resolve("woflo").resolve("backups").resolve(LocalDateTime.now().format(TIMESTAMP) + "_" + reason);
         try {
             Files.createDirectories(backupDir);
@@ -24,14 +23,13 @@ public class Backup {
                 Path src = serverDir.resolve(item);
                 if (Files.exists(src)) copy(src, backupDir.resolve(item));
             }
-            console.checkDone("ready", true);
             return backupDir;
-        } catch (IOException e) { console.fail("Backup failed: " + e.getMessage()); return null; }
+        } catch (IOException e) { return null; }
     }
 
     public static boolean restore(Path backupDir, Path serverDir, Loader loader, Console console) {
         console.warn("Restoring backup...");
-        java.util.List<Path> renamed = new java.util.ArrayList<>();
+        List<Path> renamed = new ArrayList<>();
         try {
             for (String item : loader.backupItems()) {
                 Path src = backupDir.resolve(item), dest = serverDir.resolve(item);

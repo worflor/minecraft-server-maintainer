@@ -82,7 +82,7 @@ java -jar "server maintainer by woflo.jar" [options]
 - `-u, --update-only` - Update only, don't start server
 - `-r, --rollback` - Restore most recent backup
 - `-i, --interactive` - Prompt before updates
-- `-y, --yes` - Skip all prompts
+- `-y, --yes` - Skip all prompts in interactive mode
 - `-h, --help` - Show help
 
 ## Configuration

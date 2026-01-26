@@ -172,10 +172,10 @@ public enum Loader {
         try { return switch (this) {
             case FABRIC -> !Http.getJsonArray(FABRIC_META + "/versions/loader/" + mc).isEmpty();
             case QUILT -> !Http.getJsonArray(QUILT_META + "/versions/loader/" + mc).isEmpty();
-            case FORGE -> Http.obj(Http.getJson(FORGE_META + "/net/minecraftforge/forge/promotions_slim.json"), "promos").containsKey(mc + "-latest");
+            case FORGE -> { var promos = Http.obj(Http.getJson(FORGE_META + "/net/minecraftforge/forge/promotions_slim.json"), "promos"); yield promos != null && promos.containsKey(mc + "-latest"); }
             case NEOFORGE -> { String[] p = mc.split("\\."); String pfx = neoforgePrefix(p); yield Http.list(Http.getJson(NEOFORGE_META + "/api/maven/versions/releases/net/neoforged/neoforge"), "versions").stream().anyMatch(v -> v.toString().startsWith(pfx)); }
-            case PAPER, FOLIA -> !Http.arr(Http.getJson(PAPER_API + "/" + name().toLowerCase() + "/versions/" + mc + "/builds"), "builds").isEmpty();
-            case PURPUR -> { Http.getJson(PURPUR_API + "/" + mc); yield true; }
+            case PAPER, FOLIA -> !Http.arr(Http.getJson(PAPER_API + "/" + name().toLowerCase() + "/versions/" + Http.encode(mc) + "/builds"), "builds").isEmpty();
+            case PURPUR -> { Http.getJson(PURPUR_API + "/" + Http.encode(mc)); yield true; }
             case VANILLA -> true;
         }; } catch (Exception ignored) { return false; }
     }
@@ -208,7 +208,7 @@ public enum Loader {
                 }
             }
             var latest = Http.obj(Http.getJson(MOJANG_META + "/mc/game/version_manifest_v2.json"), "latest");
-            return Http.str(latest, allowSnapshots ? "snapshot" : "release");
+            return latest != null ? Http.str(latest, allowSnapshots ? "snapshot" : "release") : null;
         } catch (Exception ignored) { return null; }
     }
 
@@ -267,21 +267,25 @@ public enum Loader {
     }
 
     private boolean installPaper(String project, String mc, Path dir, Console c) throws Exception {
-        var data = Http.getJson(PAPER_API + "/" + project + "/versions/" + mc + "/builds");
+        String encMc = Http.encode(mc);
+        var data = Http.getJson(PAPER_API + "/" + project + "/versions/" + encMc + "/builds");
         var builds = Http.arr(data, "builds");
         if (builds.isEmpty()) { c.fail("No " + project + " builds for MC " + mc); return false; }
         var latest = builds.getLast();
-        int build = ((Number) latest.get("build")).intValue();
+        var buildNum = latest.get("build");
+        if (buildNum == null) { c.fail("Invalid build data for " + project); return false; }
+        int build = ((Number) buildNum).intValue();
         var downloads = Http.obj(latest, "downloads");
-        var app = Http.obj(downloads, "application");
-        String filename = Http.str(app, "name");
-        String url = PAPER_API + "/" + project + "/versions/" + mc + "/builds/" + build + "/downloads/" + filename;
+        var app = downloads != null ? Http.obj(downloads, "application") : null;
+        String filename = app != null ? Http.str(app, "name") : null;
+        if (filename == null) { c.fail("No download available for " + project); return false; }
+        String url = PAPER_API + "/" + project + "/versions/" + encMc + "/builds/" + build + "/downloads/" + Http.encode(filename);
         Http.download(url, dir.resolve(project + ".jar"));
         return true;
     }
 
     private boolean installPurpur(String mc, Path dir, Console c) throws Exception {
-        String url = PURPUR_API + "/" + mc + "/latest/download";
+        String url = PURPUR_API + "/" + Http.encode(mc) + "/latest/download";
         Http.download(url, dir.resolve("purpur.jar"));
         return true;
     }
@@ -296,7 +300,12 @@ public enum Loader {
         }
         if (vUrl == null) { c.fail("Version " + mc + " not found"); return false; }
         var downloads = Http.obj(Http.getJson(vUrl), "downloads");
-        Http.download(Http.str(Http.obj(downloads, "server"), "url"), dir.resolve("server.jar"));
+        if (downloads == null) { c.fail("No downloads for " + mc); return false; }
+        var server = Http.obj(downloads, "server");
+        if (server == null) { c.fail("No server JAR for " + mc); return false; }
+        String downloadUrl = Http.str(server, "url");
+        if (downloadUrl == null) { c.fail("No download URL for " + mc); return false; }
+        Http.download(downloadUrl, dir.resolve("server.jar"));
         return true;
     }
 

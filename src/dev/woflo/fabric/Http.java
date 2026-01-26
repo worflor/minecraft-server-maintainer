@@ -17,7 +17,14 @@ public class Http {
         .connectTimeout(TIMEOUT).followRedirects(HttpClient.Redirect.NORMAL).build();
 
     public static String get(String url) throws IOException, InterruptedException { return get(url, 3); }
-    private static HttpRequest req(String url, Duration t) { return HttpRequest.newBuilder().uri(URI.create(url)).header("User-Agent", USER_AGENT).timeout(t).GET().build(); }
+
+    private static HttpRequest req(String url, Duration t) throws IOException {
+        URI uri;
+        try { uri = URI.create(url); }
+        catch (IllegalArgumentException e) { throw new IOException("Invalid URL: " + url); }
+        if (!"https".equalsIgnoreCase(uri.getScheme())) throw new IOException("HTTPS required: " + url);
+        return HttpRequest.newBuilder().uri(uri).header("User-Agent", USER_AGENT).timeout(t).GET().build();
+    }
 
     private static String get(String url, int retries) throws IOException, InterruptedException {
         var res = client.send(req(url, TIMEOUT), HttpResponse.BodyHandlers.ofString());
@@ -136,7 +143,13 @@ public class Http {
                 char e = src.charAt(pos++);
                 sb.append(switch (e) {
                     case 'n' -> '\n'; case 't' -> '\t'; case 'r' -> '\r'; case '"' -> '"'; case '\\' -> '\\'; case '/' -> '/';
-                    case 'u' -> { String h = src.substring(pos, pos + 4); pos += 4; yield (char) Integer.parseInt(h, 16); }
+                    case 'u' -> {
+                        if (pos + 4 > src.length()) throw new RuntimeException("Invalid unicode escape");
+                        String h = src.substring(pos, pos + 4);
+                        pos += 4;
+                        try { yield (char) Integer.parseInt(h, 16); }
+                        catch (NumberFormatException ex) { throw new RuntimeException("Invalid unicode escape: \\u" + h); }
+                    }
                     default -> e;
                 });
             } else sb.append(c);

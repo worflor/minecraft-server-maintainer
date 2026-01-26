@@ -63,8 +63,18 @@ public class Updater {
         con.setupRows(labels.toArray(new String[0]));
         con.hideCursor();
 
-        String latest = cfg.targetVersion != null ? cfg.targetVersion : Api.getLatestMinecraft(cfg.allowSnapshots);
-        if (latest == null) { con.warn("Cannot reach Mojang API"); latest = current; }
+        String latest;
+        if (cfg.targetVersion != null) {
+            if (!cfg.targetVersion.matches(VERSION_PATTERN)) {
+                con.warn("Invalid target-version format: " + cfg.targetVersion);
+                latest = current;
+            } else {
+                latest = cfg.targetVersion;
+            }
+        } else {
+            latest = Api.getLatestMinecraft(cfg.allowSnapshots);
+            if (latest == null) { con.warn("Cannot reach Mojang API"); latest = current; }
+        }
 
         String target = current; boolean mcUp = false; Path backup = null; int row = 0;
 

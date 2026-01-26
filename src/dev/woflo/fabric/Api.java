@@ -10,7 +10,7 @@ public class Api {
     public static String getLatestMinecraft(boolean allowSnapshots) {
         try {
             var latest = Http.obj(Http.getJson(MOJANG_MANIFEST), "latest");
-            return Http.str(latest, allowSnapshots ? "snapshot" : "release");
+            return latest != null ? Http.str(latest, allowSnapshots ? "snapshot" : "release") : null;
         } catch (Exception ignored) { return null; }
     }
 
@@ -32,6 +32,7 @@ public class Api {
             catch (IOException ignored) { return skip(mod, null); }
 
             String projectId = Http.str(current, "project_id"), oldVer = Http.str(current, "version_number");
+            if (projectId == null || projectId.isEmpty()) return skip(mod, oldVer);
             List<Object> versions = null;
             for (String l : loaders) {
                 versions = Http.getJsonArray(MODRINTH_API + "/project/" + Http.encode(projectId) +

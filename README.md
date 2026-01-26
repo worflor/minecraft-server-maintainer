@@ -17,6 +17,9 @@
   <img src="https://img.shields.io/badge/Quilt-supported-brightgreen" alt="Quilt">
   <img src="https://img.shields.io/badge/Forge-supported-brightgreen" alt="Forge">
   <img src="https://img.shields.io/badge/NeoForge-supported-brightgreen" alt="NeoForge">
+  <img src="https://img.shields.io/badge/Paper-supported-brightgreen" alt="Paper">
+  <img src="https://img.shields.io/badge/Purpur-supported-brightgreen" alt="Purpur">
+  <img src="https://img.shields.io/badge/Folia-supported-brightgreen" alt="Folia">
   <img src="https://img.shields.io/badge/Vanilla-supported-brightgreen" alt="Vanilla">
 </p>
 

@@ -164,14 +164,16 @@ On server exit:
   if exit == 0 OR runtime > window:
     reset crashes[]
     if stasisEnabled && stasisDue: createStasis()
-    restart (immediately after stasis, or after delay)
+    show countdown animation (restartDelay seconds)
+    restart
   else:
     record crash timestamp
     count recent crashes (within window)
     if recent >= maxCrashes:
       enter cooldown (wait crashWindow)
     else:
-      restart after delay
+      show countdown animation (restartDelay seconds)
+      restart
 ```
 
 ---
@@ -257,7 +259,7 @@ try (var ex = Executors.newVirtualThreadPerTaskExecutor()) {
 
 ---
 
-### Loader.java (Lines 1-163)
+### Loader.java
 
 **Responsibilities:**
 - Enum representing mod loader types
@@ -274,6 +276,9 @@ try (var ex = Executors.newVirtualThreadPerTaskExecutor()) {
 | QUILT | `quilt.mod.json` in mods | `quilt-server-launch.jar` |
 | FORGE | `forge` in JAR name, or `META-INF/mods.toml` in mods | `run.bat`/`run.sh` |
 | NEOFORGE | `META-INF/neoforge.mods.toml` in mods | `run.bat`/`run.sh` |
+| PAPER | Paperclip manifest in JAR, or `plugins/` folder | `paper.jar` |
+| PURPUR | Paperclip manifest + `purpur` in filename | `purpur.jar` |
+| FOLIA | Paperclip manifest + `folia` in filename | `folia.jar` |
 | VANILLA | `server.jar` exists and mods folder empty/missing | `server.jar` |
 
 **Key Methods:**
@@ -294,11 +299,14 @@ try (var ex = Executors.newVirtualThreadPerTaskExecutor()) {
 
 **Modrinth Loader Mappings:**
 ```java
-FABRIC  → ["fabric", "quilt"]     // Fabric mods, fallback to Quilt
-QUILT   → ["quilt", "fabric"]     // Quilt mods, fallback to Fabric
-FORGE   → ["forge", "neoforge"]   // Forge mods, fallback to NeoForge
-NEOFORGE → ["neoforge", "forge"]  // NeoForge mods, fallback to Forge
-VANILLA → []                      // No mod support
+FABRIC   → ["fabric", "quilt"]           // Fabric mods, fallback to Quilt
+QUILT    → ["quilt", "fabric"]           // Quilt mods, fallback to Fabric
+FORGE    → ["forge", "neoforge"]         // Forge mods, fallback to NeoForge
+NEOFORGE → ["neoforge", "forge"]         // NeoForge mods, fallback to Forge
+PAPER    → ["paper", "spigot", "bukkit"] // Paper plugins
+PURPUR   → ["paper", "spigot", "bukkit"] // Purpur plugins (Paper-compatible)
+FOLIA    → ["paper", "spigot", "bukkit"] // Folia plugins (Paper-compatible)
+VANILLA  → []                            // No mod support
 ```
 
 **Smart JAR Discovery Algorithm (Lines 42-61):**
@@ -417,7 +425,10 @@ For each line:
 | `rowDone(int, String)` | 68 | Mark row complete |
 | `rowDoneUpdate(int, String, String)` | 69 | Show version transition |
 | `detail(String, String, String)` | 72-75 | Show individual item update |
-| `countdown()` | 84-92 | Draining progress bar animation |
+| `countdown()` | 84-92 | Draining progress bar (1.5s, post-update) |
+| `countdownSeconds(int)` | 93-101 | Configurable countdown (restart delays) |
+| `progress(String)` | - | In-place updating status (stasis) |
+| `progressDone(String, String)` | - | Complete in-place status with checkmark |
 
 **Terminal Detection (Lines 21-22):**
 ```java
@@ -573,8 +584,11 @@ woflo/backups/YYYYMMDD-HHmmss_reason/
 |--------|-----------------|
 | FABRIC | mods/, versions/, libraries/, fabric-server-launch.jar, current_version.txt |
 | QUILT | mods/, versions/, libraries/, quilt-server-launch.jar, current_version.txt |
-| FORGE | mods/, libraries/, run.jar, current_version.txt |
-| NEOFORGE | mods/, libraries/, run.jar, current_version.txt |
+| FORGE | mods/, libraries/, run.bat, run.sh, current_version.txt |
+| NEOFORGE | mods/, libraries/, run.bat, run.sh, current_version.txt |
+| PAPER | plugins/, paper.jar, current_version.txt |
+| PURPUR | plugins/, purpur.jar, current_version.txt |
+| FOLIA | plugins/, folia.jar, current_version.txt |
 | VANILLA | server.jar, current_version.txt |
 
 **Restore Safety (Lines 26-41):**
@@ -865,6 +879,25 @@ try (var ex = Executors.newVirtualThreadPerTaskExecutor()) {
 - MC 1.21.4 → NeoForge 21.4.x
 - MC 1.20.6 → NeoForge 20.6.x
 
+### PaperMC API
+
+**Base URL:** `https://api.papermc.io/v2/projects`
+
+| Endpoint | Purpose |
+|----------|---------|
+| `/{project}` | Get project info (paper, folia) |
+| `/{project}/versions/{mc}/builds` | Get builds for MC version |
+| `/{project}/versions/{mc}/builds/{build}/downloads/{file}` | Download JAR |
+
+### Purpur API
+
+**Base URL:** `https://api.purpurmc.org/v2/purpur`
+
+| Endpoint | Purpose |
+|----------|---------|
+| `/{mc}` | Check if MC version supported |
+| `/{mc}/latest/download` | Download latest build |
+
 ### Modrinth API
 
 **Base URL:** `https://api.modrinth.com`
@@ -1121,7 +1154,10 @@ public class Console {
     public void fail(String msg)                     // Red error
     public void checking(String what)                // "Checking..."
     public void checkDone(String result, boolean ok) // Check result
-    public void countdown()                          // Draining bar
+    public void progress(String msg)                 // In-place updating status
+    public void progressDone(String label, String result)  // Complete with checkmark
+    public void countdown()                          // Draining bar (1.5s)
+    public void countdownSeconds(int seconds)        // Configurable countdown
     public void hideCursor()                         // Hide terminal cursor
     public void showCursor()                         // Show terminal cursor
     public void close()                              // Close log file
@@ -1157,7 +1193,7 @@ public class Updater {
 
 ```java
 public enum Loader {
-    FABRIC, FORGE, NEOFORGE, QUILT, VANILLA;
+    FABRIC, FORGE, NEOFORGE, QUILT, PAPER, PURPUR, FOLIA, VANILLA;
 
     public static Loader detect(Path dir)            // Auto-detect from files
     public String serverJar()                        // Expected JAR name

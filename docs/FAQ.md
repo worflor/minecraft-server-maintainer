@@ -2,9 +2,9 @@
 
 ## General
 
-**Does this work with Paper/Forge/Quilt/etc?**
+**Does this work with Paper/Forge/Quilt/etc? FOLIA???**
 
-Yes. Fabric, Quilt, Forge, NeoForge, Paper, Purpur, Folia, and Vanilla are all supported. It auto-detects what you're running and works with it.
+Yes. Fabric, Quilt, Forge, NeoForge, Paper, Purpur, Folia, and Vanilla are all natively supported. It auto-detects what you're running and works with it. 
 
 **Does it update the server jar or just mods?**
 

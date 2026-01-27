@@ -2,15 +2,26 @@
 build/
 out/
 *.class
+
+# Exclude build JARs but keep test fixture JARs
 *.jar
+!test-fixtures/**/*.jar
 
 # ProGuard (downloaded by build script)
 tools/
+
+# Gradle
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
 
 # IDE files
 .idea/
 .vscode/
 *.iml
+
+# Test outputs
+test-results/
+jacoco/
 
 # OS files
 .DS_Store

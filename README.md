@@ -158,9 +158,11 @@ lithium-0.12.1.jar
 
 ## How I Use It
 
-I have a scheduled startup task on my Server PC that runs every script in a folder. In that folder, I put shortcuts to `run.bat` files for my servers. (now to 'run.jar' with this tool)
+I have a scheduled startup task on my Server PC that runs every script in a specific folder. In there, I put shortcuts to `run.bat` files for my servers. (now to 'run.jar' with this tool)
 
 That's it. Servers start on boot, restart on crash, and self-maintain over time. I can `/stop` from in-game and it'll be back in 5 seconds. No web UI, no Docker, no panel - it's just a jar.
+
+To get the my old behaviour with this tool, just disable auto updating and, boom. You're back to using a `run.bat` that self restarts on crash. (so, better)
 
 ---
 

@@ -161,16 +161,18 @@ public class Config {
             if (col == -1)
                 continue;
             String key = line.substring(0, col).trim(), val = line.substring(col + 1).trim();
+            // Reset section when at root level with a value
+            if (indent == 0 && !val.isEmpty())
+                section = "";
             int cmt = val.indexOf('#');
             if (cmt > 0)
                 val = val.substring(0, cmt).trim();
             if (val.startsWith("\"") && val.endsWith("\""))
                 val = val.substring(1, val.length() - 1);
             if (val.isEmpty()) {
+                listKey = key;  // Track list key for upcoming list items
                 if (indent == 0)
                     section = key;
-                else
-                    listKey = key;
                 continue;
             }
             switch (section) {

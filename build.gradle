@@ -1,0 +1,189 @@
+plugins {
+    id 'java'
+    id 'jacoco'
+    id 'info.solidsoft.pitest' version '1.15.0'
+}
+
+group = 'dev.woflo'
+version = file('VERSION').text.trim()
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // JUnit 5 - Core testing framework
+    testImplementation platform('org.junit:junit-bom:5.11.3')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.junit.jupiter:junit-jupiter-params'
+
+    // JUnit Pioneer - Extended functionality including stdin/stdout capture
+    testImplementation 'org.junit-pioneer:junit-pioneer:2.3.0'
+
+    // AssertJ - Fluent assertions
+    testImplementation 'org.assertj:assertj-core:3.26.3'
+
+    // Mockito - Mocking framework with Java 21 support
+    testImplementation 'org.mockito:mockito-core:5.14.2'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.14.2'
+
+    // WireMock - HTTP API mocking
+    testImplementation 'org.wiremock:wiremock:3.10.0'
+
+    // ArchUnit - Architecture testing
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
+
+    // Awaitility - Async testing
+    testImplementation 'org.awaitility:awaitility:4.2.2'
+
+    // jqwik - Property-based testing
+    testImplementation 'net.jqwik:jqwik:1.9.3'
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+        }
+    }
+    test {
+        java {
+            srcDirs = ['test']
+        }
+        resources {
+            srcDirs = ['test-fixtures']
+        }
+    }
+}
+
+test {
+    useJUnitPlatform {
+        // Tag-based test filtering
+        includeTags 'unit', 'integration', 'loader', 'api'
+        excludeTags 'slow', 'network'
+    }
+
+    testLogging {
+        events 'passed', 'skipped', 'failed', 'standardOut', 'standardError'
+        showExceptions true
+        showCauses true
+        showStackTraces true
+        exceptionFormat 'full'
+    }
+
+    // Parallel test execution
+    maxParallelForks = Runtime.runtime.availableProcessors().intdiv(2) ?: 1
+
+    // JVM args for testing
+    jvmArgs '-Xmx1g', '-XX:+EnableDynamicAgentLoading'
+
+    // System properties for tests
+    systemProperty 'junit.jupiter.execution.parallel.enabled', 'true'
+    systemProperty 'junit.jupiter.execution.parallel.mode.default', 'concurrent'
+    systemProperty 'junit.jupiter.execution.parallel.mode.classes.default', 'concurrent'
+
+    // Timeout for individual tests
+    systemProperty 'junit.jupiter.execution.timeout.default', '60s'
+
+    // Report generation
+    reports {
+        html.required = true
+        junitXml.required = true
+    }
+
+    finalizedBy jacocoTestReport
+}
+
+// Code coverage
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+// PIT Mutation Testing - reveals weak assertions and untested code paths
+pitest {
+    targetClasses = ['dev.woflo.fabric.*']
+    targetTests = ['dev.woflo.fabric.*']
+    threads = 4
+    outputFormats = ['XML', 'HTML']
+    junit5PluginVersion = '1.2.1'
+    mutators = ['DEFAULTS', 'STRONGER']
+    timestampedReports = false
+    verbose = true
+}
+
+// Custom test tasks for specific test categories
+tasks.register('unitTest', Test) {
+    description = 'Run unit tests only'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'unit'
+    }
+}
+
+tasks.register('integrationTest', Test) {
+    description = 'Run integration tests only'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'integration'
+    }
+}
+
+tasks.register('loaderTest', Test) {
+    description = 'Run loader-specific tests'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'loader'
+    }
+}
+
+tasks.register('apiTest', Test) {
+    description = 'Run API mock tests'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'api'
+    }
+}
+
+tasks.register('propertyTest', Test) {
+    description = 'Run property-based tests (jqwik)'
+    group = 'verification'
+    useJUnitPlatform {
+        // Include jqwik engine for property-based tests
+        includeEngines 'jqwik'
+    }
+}
+
+tasks.register('networkTest', Test) {
+    description = 'Run network smoke tests (requires internet)'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'network'
+    }
+    // Network tests need longer timeout for API latency
+    systemProperty 'junit.jupiter.execution.timeout.default', '60s'
+}
+
+tasks.register('allTests', Test) {
+    description = 'Run all tests including slow ones'
+    group = 'verification'
+    useJUnitPlatform()
+}
+
+// Ensure test fixtures are available
+tasks.named('processTestResources') {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+}

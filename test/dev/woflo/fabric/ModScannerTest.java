@@ -36,7 +36,7 @@ class ModScannerTest {
         // Initialize ModScanner with woflo directory
         Path wofloDir = tempDir.resolve("woflo");
         Files.createDirectories(wofloDir);
-        ModScanner.init(wofloDir);
+        ModScanner.init(wofloDir, null);
     }
 
     // ========================================================================
@@ -117,8 +117,7 @@ class ModScannerTest {
             Path modsDir = Files.createDirectories(tempDir.resolve("mods"));
             TestFixtures.createFabricMod(modsDir.resolve("valid-mod.jar"), "validmod", "1.0");
             TestFixtures.createMinimalJar(modsDir.resolve("invalid-mod.jar"), Map.of(
-                    "META-INF/MANIFEST.MF", "Manifest-Version: 1.0\n"
-            ));
+                    "META-INF/MANIFEST.MF", "Manifest-Version: 1.0\n"));
 
             List<ModScanner.Mod> mods = ModScanner.scan(modsDir, Loader.FABRIC);
 
@@ -274,7 +273,8 @@ class ModScannerTest {
         void extractsIdFromFilename() throws IOException {
             Path datapacksDir = Files.createDirectories(tempDir.resolve("world/datapacks"));
             // Create a minimal ZIP without modrinth.json or proper pack ID
-            try (var zos = new java.util.zip.ZipOutputStream(Files.newOutputStream(datapacksDir.resolve("my-datapack-1.0.zip")))) {
+            try (var zos = new java.util.zip.ZipOutputStream(
+                    Files.newOutputStream(datapacksDir.resolve("my-datapack-1.0.zip")))) {
                 zos.putNextEntry(new java.util.zip.ZipEntry("pack.mcmeta"));
                 zos.write("""
                         {
@@ -484,7 +484,7 @@ class ModScannerTest {
             Files.createDirectories(wofloDir);
 
             // Re-init to trigger migration
-            ModScanner.init(wofloDir);
+            ModScanner.init(wofloDir, null);
 
             // Old file should be moved
             assertThat(modsDir.resolve("mods.txt")).doesNotExist();
@@ -502,7 +502,7 @@ class ModScannerTest {
             Path wofloDir = Files.createDirectories(tempDir.resolve("woflo"));
             Files.writeString(wofloDir.resolve("mods.txt"), "# new-location.jar\n");
 
-            ModScanner.init(wofloDir);
+            ModScanner.init(wofloDir, null);
 
             // woflo version should be preserved
             assertThat(Files.readString(wofloDir.resolve("mods.txt"))).contains("new-location.jar");
@@ -588,8 +588,7 @@ class ModScannerTest {
                                 "version": "1.0.0"
                             }
                             """,
-                    "META-INF/MANIFEST.MF", "Manifest-Version: 1.0\n"
-            ));
+                    "META-INF/MANIFEST.MF", "Manifest-Version: 1.0\n"));
 
             List<ModScanner.Mod> mods = ModScanner.scan(modsDir, Loader.FABRIC);
 
@@ -609,8 +608,7 @@ class ModScannerTest {
                             version: "1.0.0"
                             main: com.example.Main
                             """,
-                    "META-INF/MANIFEST.MF", "Manifest-Version: 1.0\n"
-            ));
+                    "META-INF/MANIFEST.MF", "Manifest-Version: 1.0\n"));
 
             List<ModScanner.Mod> plugins = ModScanner.scanPlugins(pluginsDir);
 
@@ -629,8 +627,7 @@ class ModScannerTest {
                             version: '1.0.0'
                             main: com.example.Main
                             """,
-                    "META-INF/MANIFEST.MF", "Manifest-Version: 1.0\n"
-            ));
+                    "META-INF/MANIFEST.MF", "Manifest-Version: 1.0\n"));
 
             List<ModScanner.Mod> plugins = ModScanner.scanPlugins(pluginsDir);
 

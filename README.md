@@ -124,11 +124,11 @@ stasis:
 
 ## Skipping Updates
 
-After first run, text files are created listing your content:
+After first run, text files are created in `woflo/`:
 
-- `mods/mods.txt`
-- `plugins/plugins.txt`
-- `datapacks/datapacks.txt`
+- `woflo/mods.txt`
+- `woflo/plugins.txt`
+- `woflo/datapacks.txt`
 
 Add `#` before any filename to skip updates:
 

@@ -48,7 +48,7 @@ I don't want to learn Docker just to run a Minecraft server. I want to double-cl
 I'm running one, two, or three servers for my friends, not a hosting company. I don't need a web panel, just the trust that its up, and will be up again if someone crashes it.
 
 **not AutoPlug?**
-AutoPlug's great and has WAY more features. It's also WAY bigger, has a paid tier, and overall isn't one 50kb jar with one config. Running the same language as the game itself.
+AutoPlug's great and has WAY more features. It's also WAY bigger, has a paid tier, and overall is far bigger than one 67kb jar with one config. Running the same language as the game itself.
 
 I've been running Minecraft servers for years with `run.bat` scripts of various complexities. This tool is the natural evolution of that.
 

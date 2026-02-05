@@ -9,6 +9,7 @@ public class Main {
     private static Console console;
     private static Config config;
     private static Loader loader;
+    private static final java.util.regex.Pattern RUN_SCRIPT_JAVA = java.util.regex.Pattern.compile("(?m)^(\"[^\"]+\"|java) @");
 
     public static void main(String[] args) {
         if (System.console() == null && !Arrays.asList(args).contains("--no-relaunch") && relaunch())
@@ -251,7 +252,7 @@ public class Main {
             // Replace java command at start of line with the full path
             String javaCmd = javaPath.equals("java") ? "java" : "\"" + javaPath + "\"";
             // Use quoteReplacement to handle backslashes in Windows paths
-            String updated = content.replaceFirst("(?m)^(\"[^\"]+\"|java) @",
+            String updated = RUN_SCRIPT_JAVA.matcher(content).replaceFirst(
                     java.util.regex.Matcher.quoteReplacement(javaCmd) + " @");
             if (!updated.equals(content)) {
                 Files.writeString(script, updated);

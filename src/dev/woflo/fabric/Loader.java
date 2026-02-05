@@ -17,6 +17,14 @@ public enum Loader {
     private static final String PURPUR_API = "https://api.purpurmc.org/v2/purpur";
     private static final String V = "current_version.txt";
 
+    // Data-driven lookup tables (indexed by ordinal: FABRIC=0, FORGE=1, NEOFORGE=2, QUILT=3, PAPER=4, PURPUR=5, FOLIA=6, VANILLA=7)
+    private static final String[] SERVER_JARS = {"fabric-server-launch.jar", "forge-server.jar", "neoforge-server.jar", "quilt-server-launch.jar", "paper.jar", "purpur.jar", "folia.jar", "server.jar"};
+    private static final String[] DISPLAY_NAMES = {"Fabric", "Forge", "NeoForge", "Quilt", "Paper", "Purpur", "Folia", "Vanilla"};
+    private static final String[] SEARCH_TERMS = {"fabric", "forge", "neoforge", "quilt", "paper", "purpur", "folia", "server"};
+    @SuppressWarnings("unchecked") private static final List<String>[] MODRINTH_LOADERS = new List[]{List.of("fabric", "quilt"), List.of("forge", "neoforge"), List.of("neoforge", "forge"), List.of("quilt", "fabric"), List.of("paper", "spigot", "bukkit"), List.of("paper", "spigot", "bukkit"), List.of("paper", "spigot", "bukkit"), List.of()};
+    @SuppressWarnings("unchecked") private static final Set<String>[] IGNORED_MOD_IDS = new Set[]{Set.of("java", "minecraft", "fabricloader", "mixinextras", "fabric-api"), Set.of("minecraft", "forge"), Set.of("minecraft", "neoforge"), Set.of("java", "minecraft", "quilt_loader", "quilted_fabric_api"), Set.of(), Set.of(), Set.of(), Set.of()};
+    private static final String[][] BACKUP_ITEMS = {{"mods", "versions", "libraries", "fabric-server-launch.jar", V}, {"mods", "libraries", "run.bat", "run.sh", V}, {"mods", "libraries", "run.bat", "run.sh", V}, {"mods", "versions", "libraries", "quilt-server-launch.jar", V}, {"plugins", "paper.jar", V}, {"plugins", "purpur.jar", V}, {"plugins", "folia.jar", V}, {"server.jar", V}};
+
     public static Loader detect(Path dir) {
         if (Files.exists(dir.resolve("fabric-server-launch.jar")) || Files.exists(dir.resolve(".fabric"))) return FABRIC;
         if (Files.exists(dir.resolve("quilt-server-launch.jar")) || Files.exists(dir.resolve(".quilt"))) return QUILT;
@@ -81,18 +89,7 @@ public enum Loader {
     public boolean usesPlugins() { return this == PAPER || this == PURPUR || this == FOLIA; }
     public boolean usesMods() { return this == FABRIC || this == QUILT || this == FORGE || this == NEOFORGE; }
 
-    public String serverJar() {
-        return switch (this) {
-            case FABRIC -> "fabric-server-launch.jar";
-            case QUILT -> "quilt-server-launch.jar";
-            case FORGE -> "forge-server.jar";
-            case NEOFORGE -> "neoforge-server.jar";
-            case PAPER -> "paper.jar";
-            case PURPUR -> "purpur.jar";
-            case FOLIA -> "folia.jar";
-            case VANILLA -> "server.jar";
-        };
-    }
+    public String serverJar() { return SERVER_JARS[ordinal()]; }
 
     public String findServerJar(Path dir) {
         String expected = serverJar();
@@ -115,10 +112,7 @@ public enum Loader {
             } catch (IOException ignored) {}
         }
 
-        String search = switch (this) {
-            case FABRIC -> "fabric"; case QUILT -> "quilt"; case FORGE -> "forge"; case NEOFORGE -> "neoforge";
-            case PAPER -> "paper"; case PURPUR -> "purpur"; case FOLIA -> "folia"; case VANILLA -> "server";
-        };
+        String search = SEARCH_TERMS[ordinal()];
 
         try (var s = Files.list(dir)) {
             var jars = s.filter(p -> p.toString().endsWith(".jar"))
@@ -134,45 +128,13 @@ public enum Loader {
         return expected;
     }
 
-    public String displayName() {
-        return switch (this) {
-            case FABRIC -> "Fabric"; case FORGE -> "Forge"; case NEOFORGE -> "NeoForge"; case QUILT -> "Quilt";
-            case PAPER -> "Paper"; case PURPUR -> "Purpur"; case FOLIA -> "Folia"; case VANILLA -> "Vanilla";
-        };
-    }
+    public String displayName() { return DISPLAY_NAMES[ordinal()]; }
 
-    public List<String> modrinthLoaders() {
-        return switch (this) {
-            case FABRIC -> List.of("fabric", "quilt");
-            case QUILT -> List.of("quilt", "fabric");
-            case NEOFORGE -> List.of("neoforge", "forge");
-            case FORGE -> List.of("forge", "neoforge");
-            case PAPER, PURPUR, FOLIA -> List.of("paper", "spigot", "bukkit");
-            case VANILLA -> List.of();
-        };
-    }
+    public List<String> modrinthLoaders() { return MODRINTH_LOADERS[ordinal()]; }
 
-    public Set<String> ignoredModIds() {
-        return switch (this) {
-            case FABRIC -> Set.of("java", "minecraft", "fabricloader", "mixinextras", "fabric-api");
-            case QUILT -> Set.of("java", "minecraft", "quilt_loader", "quilted_fabric_api");
-            case FORGE -> Set.of("minecraft", "forge");
-            case NEOFORGE -> Set.of("minecraft", "neoforge");
-            case PAPER, PURPUR, FOLIA, VANILLA -> Set.of();
-        };
-    }
+    public Set<String> ignoredModIds() { return IGNORED_MOD_IDS[ordinal()]; }
 
-    public String[] backupItems() {
-        return switch (this) {
-            case FABRIC -> new String[]{"mods", "versions", "libraries", "fabric-server-launch.jar", V};
-            case QUILT -> new String[]{"mods", "versions", "libraries", "quilt-server-launch.jar", V};
-            case FORGE, NEOFORGE -> new String[]{"mods", "libraries", "run.bat", "run.sh", V};
-            case PAPER -> new String[]{"plugins", "paper.jar", V};
-            case PURPUR -> new String[]{"plugins", "purpur.jar", V};
-            case FOLIA -> new String[]{"plugins", "folia.jar", V};
-            case VANILLA -> new String[]{"server.jar", V};
-        };
-    }
+    public String[] backupItems() { return BACKUP_ITEMS[ordinal()]; }
 
     public boolean isReady(String mc) {
         try { return switch (this) {

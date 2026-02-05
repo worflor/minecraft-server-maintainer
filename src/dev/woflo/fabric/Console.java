@@ -254,35 +254,16 @@ public class Console {
         log("OK", label + " " + result);
     }
 
-    public void countdown() {
-        if (tier < 2) {
-            sleep(COUNTDOWN_FRAMES * 50);
-            return;
-        }
-        hideCursor();
-        for (int i = COUNTDOWN_FRAMES; i >= 0; i--) {
-            double t = i / (double) COUNTDOWN_FRAMES;
-            int w = (int) (t * t * COUNTDOWN_WIDTH);
-            System.out.print(
-                    (i == COUNTDOWN_FRAMES ? "\n  " : "\r  ") + p(BLK.repeat(w)) + " ".repeat(COUNTDOWN_WIDTH - w));
-            System.out.flush();
-            sleep(50);
-        }
-        System.out.print("\r" + " ".repeat(COUNTDOWN_WIDTH + 4) + "\r");
-        showCursor();
-    }
+    public void countdown() { countdownFrames(COUNTDOWN_FRAMES); }
+    public void countdownSeconds(int seconds) { countdownFrames(seconds * 20); }
 
-    public void countdownSeconds(int seconds) {
-        if (tier < 2) {
-            sleep(seconds * 1000);
-            return;
-        }
+    private void countdownFrames(int frames) {
+        if (tier < 2) { sleep(frames * 50); return; }
         hideCursor();
-        int totalFrames = seconds * 20;
-        for (int i = totalFrames; i >= 0; i--) {
-            double t = i / (double) totalFrames;
+        for (int i = frames; i >= 0; i--) {
+            double t = i / (double) frames;
             int w = (int) (t * t * COUNTDOWN_WIDTH);
-            System.out.print((i == totalFrames ? "\n  " : "\r  ") + p(BLK.repeat(w)) + " ".repeat(COUNTDOWN_WIDTH - w));
+            System.out.print((i == frames ? "\n  " : "\r  ") + p(BLK.repeat(w)) + " ".repeat(COUNTDOWN_WIDTH - w));
             System.out.flush();
             sleep(50);
         }

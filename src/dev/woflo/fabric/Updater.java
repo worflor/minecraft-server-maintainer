@@ -9,6 +9,9 @@ import java.util.function.*;
 public class Updater {
     private static final String VERSION_PATTERN = "\\d+\\.\\d+(\\.\\d+)?";
     private static final String[] STARTUP_SUCCESS_MARKERS = {"Done (", "For help, type", "Applying patches", "You need to agree to the EULA"};
+    private static final java.util.regex.Pattern JAVA_VER = java.util.regex.Pattern.compile("version \"(\\d+)");
+    private static final java.util.regex.Pattern NEOFORGE_VER = java.util.regex.Pattern.compile("neoforge/(\\d+)\\.(\\d+)\\.\\d+/");
+    private static final java.util.regex.Pattern FORGE_VER = java.util.regex.Pattern.compile("forge/(\\d+\\.\\d+(?:\\.\\d+)?)-");
     private final Path dir;
     private final Config cfg;
     private final Console con;
@@ -191,7 +194,7 @@ public class Updater {
             p = new ProcessBuilder("java", "-version").redirectErrorStream(true).start();
             String out; try (var is = p.getInputStream()) { out = new String(is.readAllBytes()); }
             p.waitFor(5, TimeUnit.SECONDS);
-            var m = java.util.regex.Pattern.compile("version \"(\\d+)").matcher(out);
+            var m = JAVA_VER.matcher(out);
             if (m.find()) return Integer.parseInt(m.group(1)) >= 21;
             return false;
         } catch (Exception e) { return false; }
@@ -226,13 +229,13 @@ public class Updater {
             if (!Files.exists(p)) continue;
             try {
                 String content = Files.readString(p);
-                var m = java.util.regex.Pattern.compile("neoforge/(\\d+)\\.(\\d+)\\.\\d+/").matcher(content);
+                var m = NEOFORGE_VER.matcher(content);
                 if (m.find()) {
                     String major = m.group(1), minor = m.group(2);
                     return "0".equals(minor) ? "1." + major : "1." + major + "." + minor;
                 }
                 // Forge: libraries/net/minecraftforge/forge/1.21.1-xxx/
-                m = java.util.regex.Pattern.compile("forge/(\\d+\\.\\d+(?:\\.\\d+)?)-").matcher(content);
+                m = FORGE_VER.matcher(content);
                 if (m.find()) return m.group(1);
             } catch (IOException ignored) {}
         }

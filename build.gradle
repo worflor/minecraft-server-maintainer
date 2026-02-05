@@ -62,6 +62,15 @@ sourceSets {
     }
 }
 
+jar {
+    manifest {
+        attributes(
+            'Main-Class': 'dev.woflo.fabric.Main',
+            'Implementation-Version': project.version
+        )
+    }
+}
+
 test {
     useJUnitPlatform {
         // Tag-based test filtering

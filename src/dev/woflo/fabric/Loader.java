@@ -71,8 +71,9 @@ public enum Loader {
         try (var z = new ZipFile(jar.toFile())) {
             if (z.getEntry("fabric.mod.json") != null) return "fabric";
             if (z.getEntry("quilt.mod.json") != null) return "quilt";
-            if (z.getEntry("META-INF/mods.toml") != null) return "forge";
+            // NeoForge before Forge - some mods have both for backwards compat
             if (z.getEntry("META-INF/neoforge.mods.toml") != null) return "neoforge";
+            if (z.getEntry("META-INF/mods.toml") != null) return "forge";
         } catch (IOException ignored) {}
         return null;
     }
@@ -96,6 +97,15 @@ public enum Loader {
     public String findServerJar(Path dir) {
         String expected = serverJar();
         if (Files.exists(dir.resolve(expected))) return expected;
+
+        // Modern Forge/NeoForge use run scripts - check these FIRST
+        if (this == FORGE || this == NEOFORGE) {
+            boolean hasRunBat = Files.exists(dir.resolve("run.bat"));
+            boolean hasRunSh = Files.exists(dir.resolve("run.sh"));
+            if (hasRunBat || hasRunSh) {
+                return System.getProperty("os.name").toLowerCase().contains("win") && hasRunBat ? "run.bat" : "run.sh";
+            }
+        }
 
         if (usesPlugins()) {
             try (var s = Files.list(dir)) {
@@ -121,10 +131,6 @@ public enum Loader {
             if (jars.size() > 1) throw new RuntimeException("Multiple " + displayName() + " JARs: " + String.join(", ", jars) + " - set server-jar in config");
         } catch (IOException ignored) {}
 
-        // Forge/NeoForge run scripts
-        if ((this == FORGE || this == NEOFORGE) && (Files.exists(dir.resolve("run.bat")) || Files.exists(dir.resolve("run.sh")))) {
-            return System.getProperty("os.name").toLowerCase().contains("win") ? "run.bat" : "run.sh";
-        }
         return expected;
     }
 

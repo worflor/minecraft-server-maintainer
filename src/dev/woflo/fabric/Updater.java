@@ -42,13 +42,19 @@ public class Updater {
         String current = detectVersion();
 
         if (current == null) {
-            con.header(loader.displayName(), "new"); if (dry) con.dryRun();
-            con.checking("Fetching latest");
-            String target = loader.getLatestSupported(cfg.allowSnapshots);
-            if (target == null) { con.fail("Cannot fetch versions"); clearPending(); return 1; }
-            con.checkDone(target, true);
-            if (!dry) { con.checking("Installing " + loader.displayName()); if (!loader.install(target, dir, con)) { clearPending(); return 1; } con.checkDone("installed", true); writeVersion(target); }
-            current = target;
+            if (!cfg.updateMinecraft) {
+                // Updates disabled and no version detected - just run the server as-is
+                con.header(loader.displayName(), "unknown"); if (dry) con.dryRun();
+                current = "unknown";
+            } else {
+                con.header(loader.displayName(), "new"); if (dry) con.dryRun();
+                con.checking("Fetching latest");
+                String target = loader.getLatestSupported(cfg.allowSnapshots);
+                if (target == null) { con.fail("Cannot fetch versions"); clearPending(); return 1; }
+                con.checkDone(target, true);
+                if (!dry) { con.checking("Installing " + loader.displayName()); if (!loader.install(target, dir, con)) { clearPending(); return 1; } con.checkDone("installed", true); writeVersion(target); }
+                current = target;
+            }
         }
 
         con.header(loader.displayName(), current); if (dry) con.dryRun();
@@ -204,6 +210,32 @@ public class Updater {
         if (Files.exists(vf)) try { String v = Files.readString(vf).trim(); if (v.matches(VERSION_PATTERN)) return v; } catch (IOException ignored) {}
         Path vd = dir.resolve("versions");
         if (Files.exists(vd)) try (var s = Files.list(vd)) { var f = s.filter(Files::isDirectory).map(p -> p.getFileName().toString()).filter(n -> n.matches(VERSION_PATTERN)).max(Updater::compareVersions); if (f.isPresent()) { writeVersion(f.get()); return f.get(); } } catch (IOException ignored) {}
+        // Forge/NeoForge: extract MC version from run script args path
+        if (loader == Loader.FORGE || loader == Loader.NEOFORGE) {
+            String v = detectVersionFromRunScript();
+            if (v != null) { writeVersion(v); return v; }
+        }
+        return null;
+    }
+
+    private String detectVersionFromRunScript() {
+        // Parse run.bat/run.sh to find args path like: libraries/net/neoforged/neoforge/21.1.172/win_args.txt
+        // NeoForge version 21.1.172 means MC 1.21.1 (major.minor.build → 1.major.minor)
+        for (String script : new String[]{"run.bat", "run.sh"}) {
+            Path p = dir.resolve(script);
+            if (!Files.exists(p)) continue;
+            try {
+                String content = Files.readString(p);
+                var m = java.util.regex.Pattern.compile("neoforge/(\\d+)\\.(\\d+)\\.\\d+/").matcher(content);
+                if (m.find()) {
+                    String major = m.group(1), minor = m.group(2);
+                    return "0".equals(minor) ? "1." + major : "1." + major + "." + minor;
+                }
+                // Forge: libraries/net/minecraftforge/forge/1.21.1-xxx/
+                m = java.util.regex.Pattern.compile("forge/(\\d+\\.\\d+(?:\\.\\d+)?)-").matcher(content);
+                if (m.find()) return m.group(1);
+            } catch (IOException ignored) {}
+        }
         return null;
     }
 

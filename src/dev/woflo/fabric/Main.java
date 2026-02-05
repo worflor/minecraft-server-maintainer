@@ -66,6 +66,9 @@ public class Main {
             int exit = new Updater(serverDir, config, console, dryRun, loader, interactive).run();
             if (exit != 0)
                 System.exit(exit);
+            // Sync Java path and JVM args for Forge/NeoForge
+            if (!dryRun && (loader == Loader.FORGE || loader == Loader.NEOFORGE))
+                syncRunScript(Java.findForMc(readVersion()));
             if (!dryRun && !updateOnly)
                 runServer(interactiveFlag);
         } catch (Exception e) {
@@ -109,15 +112,20 @@ public class Main {
             System.exit(1);
         }
         checkEula(interactiveFlag);
+
+        // Find the right Java for this MC version
+        String mcVersion = readVersion();
+        String javaPath = Java.findForMc(mcVersion);
+
         var cmd = new ArrayList<String>();
         if (jarName.endsWith(".bat") || jarName.endsWith(".sh")) {
-            // Modern Forge/NeoForge use run scripts
+            // Run scripts already synced after updater
             if (jarName.endsWith(".bat"))
-                cmd.addAll(List.of("cmd", "/c", jar.toString()));
+                cmd.addAll(List.of("cmd", "/c", jar.toString(), "nogui"));
             else
-                cmd.addAll(List.of("bash", jar.toString()));
+                cmd.addAll(List.of("bash", jar.toString(), "nogui"));
         } else {
-            cmd.addAll(List.of("java", "-Xms" + config.memoryMin, "-Xmx" + config.memoryMax));
+            cmd.addAll(List.of(javaPath, "-Xms" + config.memoryMin, "-Xmx" + config.memoryMax));
             cmd.addAll(config.jvmArgs);
             cmd.addAll(List.of("-jar", jar.toString(), "nogui"));
         }
@@ -204,6 +212,52 @@ public class Main {
         } catch (IOException e) {
             console.fail("Cannot check EULA: " + e.getMessage());
             System.exit(1);
+        }
+    }
+
+    private static String readVersion() {
+        try {
+            Path vf = serverDir.resolve("current_version.txt");
+            if (Files.exists(vf)) return Files.readString(vf).trim();
+        } catch (IOException ignored) {}
+        return "unknown";
+    }
+
+    private static void syncRunScript(String javaPath) {
+        // Sync woflo config to user_jvm_args.txt for Forge/NeoForge
+        Path jvmArgs = serverDir.resolve("user_jvm_args.txt");
+        try {
+            var lines = new ArrayList<String>();
+            lines.add("# Managed by Server Maintainer - edit woflo/config.yml instead");
+            lines.add("-Xms" + config.memoryMin);
+            lines.add("-Xmx" + config.memoryMax);
+            for (String arg : config.jvmArgs) {
+                lines.add(arg);
+            }
+            Files.writeString(jvmArgs, String.join("\n", lines) + "\n");
+        } catch (IOException e) {
+            console.warn("Could not sync JVM args: " + e.getMessage());
+        }
+
+        // Update run scripts to use the correct Java
+        updateRunScript(serverDir.resolve("run.bat"), javaPath, true);
+        updateRunScript(serverDir.resolve("run.sh"), javaPath, false);
+    }
+
+    private static void updateRunScript(Path script, String javaPath, boolean isWindows) {
+        if (!Files.exists(script)) return;
+        try {
+            String content = Files.readString(script);
+            // Replace java command at start of line with the full path
+            String javaCmd = javaPath.equals("java") ? "java" : "\"" + javaPath + "\"";
+            // Use quoteReplacement to handle backslashes in Windows paths
+            String updated = content.replaceFirst("(?m)^(\"[^\"]+\"|java) @",
+                    java.util.regex.Matcher.quoteReplacement(javaCmd) + " @");
+            if (!updated.equals(content)) {
+                Files.writeString(script, updated);
+            }
+        } catch (IOException e) {
+            console.warn("Could not update " + script.getFileName() + ": " + e.getMessage());
         }
     }
 

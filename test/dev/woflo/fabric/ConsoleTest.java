@@ -37,6 +37,9 @@ class ConsoleTest {
 
     @BeforeEach
     void setUp() throws IOException {
+        // Force full tier since System.console() is null in test environment
+        System.setProperty("server.maintainer.term", "full");
+
         logFile = tempDir.resolve("test.log");
         console = new Console(logFile.toFile());
 
@@ -50,6 +53,7 @@ class ConsoleTest {
     void tearDown() {
         System.setOut(originalOut);
         console.close();
+        System.clearProperty("server.maintainer.term");
     }
 
     // ========================================================================
@@ -208,7 +212,7 @@ class ConsoleTest {
             String output = stdout.toString();
             assertThat(output).contains("1.20.6");
             assertThat(output).contains("1.21.1");
-            assertThat(output).contains("->");
+            assertThat(output).contains("\u2192"); // Unicode arrow for tier 4
 
             // Should log update
             String logContent = Files.readString(logFile);

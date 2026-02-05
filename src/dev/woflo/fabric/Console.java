@@ -78,33 +78,13 @@ public class Console {
     }
 
     // Color helpers
-    private String col(String s, String x) {
-        return tty ? x + s + R : s;
-    }
-
-    private String p(String s) {
-        return col(s, P);
-    }
-
-    private String g(String s) {
-        return col(s, G);
-    }
-
-    private String y(String s) {
-        return col(s, Y);
-    }
-
-    private String r(String s) {
-        return col(s, E);
-    }
-
-    private String a(String s) {
-        return col(s, A);
-    }
-
-    private String w(String s) {
-        return col(s, W);
-    }
+    private String col(String s, String c) { return tty ? c + s + R : s; }
+    private String p(String s) { return col(s, P); }
+    private String g(String s) { return col(s, G); }
+    private String y(String s) { return col(s, Y); }
+    private String r(String s) { return col(s, E); }
+    private String a(String s) { return col(s, A); }
+    private String w(String s) { return col(s, W); }
 
     private void log(String type, String msg) {
         log.println("[" + LocalDateTime.now().format(LOG_FMT) + "] " + type + " | " + msg);
@@ -112,16 +92,14 @@ public class Console {
 
     public void header(String loader, String ver) {
         String title = "  Server Maintainer", brand = "woflo  ", sub = "  " + loader + " " + ver;
-        System.out.println("\n  " + p(TL + H.repeat(HEADER_WIDTH) + TR));
-        System.out.println(
-                "  " + p(V) + w(title) + " ".repeat(HEADER_WIDTH - title.length() - brand.length()) + a(brand) + p(V));
+        String hr = H.repeat(HEADER_WIDTH);
+        System.out.println("\n  " + p(TL + hr + TR));
+        System.out.println("  " + p(V) + w(title) + " ".repeat(HEADER_WIDTH - title.length() - brand.length()) + a(brand) + p(V));
         System.out.println("  " + p(V) + a(sub) + " ".repeat(HEADER_WIDTH - sub.length()) + p(V));
-        System.out.println("  " + p(BL + H.repeat(HEADER_WIDTH) + BR) + "\n");
+        System.out.println("  " + p(BL + hr + BR) + "\n");
     }
 
-    public void dryRun() {
-        System.out.println("  " + a("(dry run)") + "\n");
-    }
+    public void dryRun() { System.out.println("  " + a("(dry run)") + "\n"); }
 
     public void setupRows(String... lbl) {
         labels = new ArrayList<>(Arrays.asList(lbl));
@@ -201,8 +179,8 @@ public class Console {
     }
 
     public void detail(String name, String from, String to) {
-        System.out.println("    " + g(CHK) + " " + w(name.length() <= 18 ? name : name.substring(0, 17) + "~") + " "
-                + a(from + " " + ARW + " ") + g(to));
+        String n = name.length() <= 18 ? name : name.substring(0, 17) + "~";
+        System.out.println("    " + g(CHK) + " " + w(n) + " " + a(from + " " + ARW + " ") + g(to));
         System.out.flush();
         log("Update", name + " " + from + " -> " + to);
     }
@@ -211,44 +189,24 @@ public class Console {
         System.out.println();
     }
 
-    public void info(String msg) {
-        System.out.println("  " + a(msg));
-        log("Info", msg);
-    }
-
-    public void warn(String msg) {
-        System.out.println("  " + y("! " + msg));
-        log("WARN", msg);
-    }
-
-    public void fail(String msg) {
-        System.out.println("  " + r("X " + msg));
-        log("ERROR", msg);
-    }
-
-    public void checking(String what) {
-        System.out.print("  " + a(what + "..."));
-        System.out.flush();
-    }
+    public void info(String msg) { System.out.println("  " + a(msg)); log("Info", msg); }
+    public void warn(String msg) { System.out.println("  " + y("! " + msg)); log("WARN", msg); }
+    public void fail(String msg) { System.out.println("  " + r("X " + msg)); log("ERROR", msg); }
+    public void checking(String what) { System.out.print("  " + a(what + "...")); System.out.flush(); }
 
     public void checkDone(String result, boolean ok) {
         System.out.println(" " + (ok ? w(result) + " " + g(CHK) : y(result)));
     }
 
     public void progress(String msg) {
-        if (tier < 2)
-            return;
+        if (tier < 2) return;
         hideCursor();
         System.out.print("\r" + CL + "  " + a(msg + "..."));
         System.out.flush();
     }
 
     public void progressDone(String label, String result) {
-        if (tier < 2) {
-            System.out.println("  " + label + " " + result);
-            log("OK", label + " " + result);
-            return;
-        }
+        if (tier < 2) { System.out.println("  " + label + " " + result); log("OK", label + " " + result); return; }
         System.out.println("\r" + CL + "  " + w(label) + " " + g(result) + " " + g(CHK));
         showCursor();
         log("OK", label + " " + result);

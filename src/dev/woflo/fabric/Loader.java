@@ -15,7 +15,7 @@ public enum Loader {
     private static final String MOJANG_META = "https://launchermeta.mojang.com";
     private static final String PAPER_API = "https://api.papermc.io/v2/projects";
     private static final String PURPUR_API = "https://api.purpurmc.org/v2/purpur";
-    private static final String V = "current_version.txt";
+    private static final String VER_FILE = "current_version.txt";
 
     // Data-driven lookup tables (indexed by ordinal: FABRIC=0, FORGE=1, NEOFORGE=2, QUILT=3, PAPER=4, PURPUR=5, FOLIA=6, VANILLA=7)
     private static final String[] SERVER_JARS = {"fabric-server-launch.jar", "forge-server.jar", "neoforge-server.jar", "quilt-server-launch.jar", "paper.jar", "purpur.jar", "folia.jar", "server.jar"};
@@ -23,7 +23,7 @@ public enum Loader {
     private static final String[] SEARCH_TERMS = {"fabric", "forge", "neoforge", "quilt", "paper", "purpur", "folia", "server"};
     @SuppressWarnings("unchecked") private static final List<String>[] MODRINTH_LOADERS = new List[]{List.of("fabric", "quilt"), List.of("forge", "neoforge"), List.of("neoforge", "forge"), List.of("quilt", "fabric"), List.of("paper", "spigot", "bukkit"), List.of("paper", "spigot", "bukkit"), List.of("paper", "spigot", "bukkit"), List.of()};
     @SuppressWarnings("unchecked") private static final Set<String>[] IGNORED_MOD_IDS = new Set[]{Set.of("java", "minecraft", "fabricloader", "mixinextras", "fabric-api"), Set.of("minecraft", "forge"), Set.of("minecraft", "neoforge"), Set.of("java", "minecraft", "quilt_loader", "quilted_fabric_api"), Set.of(), Set.of(), Set.of(), Set.of()};
-    private static final String[][] BACKUP_ITEMS = {{"mods", "versions", "libraries", "fabric-server-launch.jar", V}, {"mods", "libraries", "run.bat", "run.sh", V}, {"mods", "libraries", "run.bat", "run.sh", V}, {"mods", "versions", "libraries", "quilt-server-launch.jar", V}, {"plugins", "paper.jar", V}, {"plugins", "purpur.jar", V}, {"plugins", "folia.jar", V}, {"server.jar", V}};
+    private static final String[][] BACKUP_ITEMS = {{"mods", "versions", "libraries", "fabric-server-launch.jar", VER_FILE}, {"mods", "libraries", "run.bat", "run.sh", VER_FILE}, {"mods", "libraries", "run.bat", "run.sh", VER_FILE}, {"mods", "versions", "libraries", "quilt-server-launch.jar", VER_FILE}, {"plugins", "paper.jar", VER_FILE}, {"plugins", "purpur.jar", VER_FILE}, {"plugins", "folia.jar", VER_FILE}, {"server.jar", VER_FILE}};
 
     public static Loader detect(Path dir) {
         if (Files.exists(dir.resolve("fabric-server-launch.jar")) || Files.exists(dir.resolve(".fabric"))) return FABRIC;

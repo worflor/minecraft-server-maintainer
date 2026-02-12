@@ -9,6 +9,7 @@ public class Main {
     private static Console console;
     private static Config config;
     private static Loader loader;
+    private static Process serverProc;
     private static final java.util.regex.Pattern RUN_SCRIPT_JAVA = java.util.regex.Pattern.compile("(?m)^(\"[^\"]+\"|java) @");
 
     public static void main(String[] args) {
@@ -103,8 +104,6 @@ public class Main {
         }
     }
 
-    private static Process serverProc;
-
     private static void runServer(Boolean interactiveFlag) {
         String jarName = config.serverJar != null ? config.serverJar : loader.findServerJar(serverDir);
         Path jar = serverDir.resolve(jarName);
@@ -177,10 +176,7 @@ public class Main {
                 break;
             } catch (Exception e) {
                 System.err.println("Failed to start: " + e.getMessage());
-                try {
-                    Thread.sleep(delayMs);
-                } catch (InterruptedException e2) {
-                }
+                try { Thread.sleep(delayMs); } catch (InterruptedException e2) { Thread.currentThread().interrupt(); }
             }
         }
     }
@@ -232,20 +228,18 @@ public class Main {
             lines.add("# Managed by Server Maintainer - edit woflo/config.yml instead");
             lines.add("-Xms" + config.memoryMin);
             lines.add("-Xmx" + config.memoryMax);
-            for (String arg : config.jvmArgs) {
-                lines.add(arg);
-            }
+            lines.addAll(config.jvmArgs);
             Files.writeString(jvmArgs, String.join("\n", lines) + "\n");
         } catch (IOException e) {
             console.warn("Could not sync JVM args: " + e.getMessage());
         }
 
         // Update run scripts to use the correct Java
-        updateRunScript(serverDir.resolve("run.bat"), javaPath, true);
-        updateRunScript(serverDir.resolve("run.sh"), javaPath, false);
+        updateRunScript(serverDir.resolve("run.bat"), javaPath);
+        updateRunScript(serverDir.resolve("run.sh"), javaPath);
     }
 
-    private static void updateRunScript(Path script, String javaPath, boolean isWindows) {
+    private static void updateRunScript(Path script, String javaPath) {
         if (!Files.exists(script)) return;
         try {
             String content = Files.readString(script);

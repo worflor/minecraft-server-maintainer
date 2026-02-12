@@ -68,12 +68,7 @@ public class Console {
                 return 4;
             return utf8 ? 3 : 2;
         }
-        if (term.contains("256color"))
-            return utf8 ? 4 : 2;
-        if (term.contains("screen") || term.contains("tmux"))
-            return utf8 ? 3 : 2;
-        if (term.contains("xterm"))
-            return utf8 ? 3 : 2;
+        if (term.contains("256color")) return utf8 ? 4 : 2;
         return utf8 ? 3 : 2;
     }
 

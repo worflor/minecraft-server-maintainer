@@ -213,7 +213,6 @@ public class Updater {
         if (Files.exists(vf)) try { String v = Files.readString(vf).trim(); if (v.matches(VERSION_PATTERN)) return v; } catch (IOException ignored) {}
         Path vd = dir.resolve("versions");
         if (Files.exists(vd)) try (var s = Files.list(vd)) { var f = s.filter(Files::isDirectory).map(p -> p.getFileName().toString()).filter(n -> n.matches(VERSION_PATTERN)).max(Updater::compareVersions); if (f.isPresent()) { writeVersion(f.get()); return f.get(); } } catch (IOException ignored) {}
-        // Forge/NeoForge: extract MC version from run script args path
         if (loader == Loader.FORGE || loader == Loader.NEOFORGE) {
             String v = detectVersionFromRunScript();
             if (v != null) { writeVersion(v); return v; }
@@ -242,7 +241,6 @@ public class Updater {
         return null;
     }
 
-    // Numeric version comparison: 1.20.10 > 1.20.2
     private static int compareVersions(String a, String b) {
         String[] pa = a.split("\\."), pb = b.split("\\.");
         for (int i = 0; i < Math.max(pa.length, pb.length); i++) {
